@@ -166,6 +166,20 @@ TARGETED_TF = {
     ('db', 'tf-7', 8): {'note': 'علاقة متعدد إلى متعدد، فكل طلب يمكن أن يحتوي أكثر من منتج' },
 }
 
+# ---------------------------------------------------------------------------
+# الاقتصاد الكلي — المفتاح الرسمي "نماذج الاجابات" (مصوّر من ملف د. المادة).
+# الإجابة تُؤخذ من المفتاح حرفيًا كما هي، حتى لو خالفت الرأي العلمي،
+# لأن الامتحان بيتصحّح على المفتاح ده.
+#   أولا: MCQ 1..38  ->  أ ب ج ب ب د ب ج د أ ب ب ج د ب ج ب ج ب د أ ج ب
+#                       ب د د ب د ج ج د ب أ ب د د ج أ
+#   ثانيا: T/F 1..36 ->  ✓ X X ✓ X X X X X X X ✓ X ✓ ✓ ✓ ✓ X X ✓
+#                       ✓ ✓ ✓ X ✓ X ✓ ✓ ✓ X ✓ X X X X X
+MACRO_MCQ_KEY = list('أبجببدبجدأببجدبجبجبدأجببددبدججدبأبددجأ')  # 38 حرفًا — ترتيب 1..38
+MACRO_TF_KEY = [True, False, False, True, False, False, False, False, False, False,
+                False, True, False, True, True, True, True, False, False, True,
+                True, True, True, False, True, False, True, True, True, False,
+                True, False, False, False, False, False]
+
 # prog T/F statements that refer to one of the three flow-chart figures
 PROG_TF_FIG = {26: '1', 27: '2', 28: '3', 29: '3', 30: '3'}
 
@@ -244,6 +258,18 @@ def apply(courses):
 
         # (after any insertion, so 1-based indices stay valid)
         _apply_targeted_tf(c)
+
+        # ---- macro: enforce the official answer key (verbatim from the PDF key sheet)
+        if c['id'] == 'macro':
+            for s in c['sections']:
+                if s['type'] == 'mcq':
+                    for i, q in enumerate(s['questions'], 1):
+                        if i <= len(MACRO_MCQ_KEY):
+                            q['ans'] = 'أبجد'.index(MACRO_MCQ_KEY[i - 1])
+                elif s['type'] == 'tf':
+                    for i, q in enumerate(s['questions'], 1):
+                        if i <= len(MACRO_TF_KEY):
+                            q['ans'] = MACRO_TF_KEY[i - 1]
 
         # generic text pass over everything
         for s in c['sections']:
