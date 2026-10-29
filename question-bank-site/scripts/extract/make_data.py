@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys, re, json
-import paths  # noqa: F401  (repo-relative sys.path setup)
+sys.path.insert(0, '/home/user')
+sys.path.insert(0, '/home/user/tools')
 import pymupdf
 import layout
 import build as B
-from manual import (ACC_MCQ, ACC_TF, GOV_MCQ, MAC_INSERT_Q18, MAC_TAIL, MAC_FIX_Q,
+from manual import (ACC_MCQ, ACC_TF, GOV_MCQ, GOV_TF, MAC_INSERT_Q18, MAC_TAIL, MAC_FIX_Q,
                     MAC_ANS, INV_INSERT_46)
 from files import MAC
 import ins as INS
@@ -336,15 +337,17 @@ def build_all():
 
     # ---------------- GOVERNMENT SERVICES
     gov = [{'q': q, 'options': o, 'ans': a} for q, o, a in GOV_MCQ]
+    gov_tf = [{'q': q, 'ans': a} for q, a in GOV_TF]
     courses.append({
         'id': 'gov', 'title': 'اقتصاديات الخدمات الحكومية', 'emoji': '🏛️', 'color': '#0d9488',
         'sections': [
             {'id': 'mcq', 'title': 'اختيار الإجابة المناسبة', 'type': 'mcq', 'questions': gov},
+            {'id': 'tf', 'title': 'ضع علامة (✓) أمام العبارات الصحيحة أو (×) أمام الخاطئة', 'type': 'tf', 'questions': gov_tf},
         ]})
 
     # ---------------- INSURANCE & RISK MANAGEMENT
     ins_mcq, ins_tf, _bad = INS.parse_insurance(
-        paths.PDFS + '/بنك أسئلة التأمين وإدارة -منتصف الفصل الدراسي 2027-2026.pdf')
+        '/home/user/uploads/بنك أسئلة التأمين وإدارة -منتصف الفصل الدراسي 2027-2026.pdf')
     ins_secs = []
     _order, _by = [], {}
     for item in ins_mcq + ins_tf:
@@ -364,7 +367,7 @@ def build_all():
                     'color': '#0284c7', 'sections': ins_secs, 'raw': True})
 
     # ---------------- DATABASES
-    db_mcq, db_tf = INS.parse_db(paths.PDFS + '/بنك أسئلة مقرر قواعد البيانات  short.pdf')
+    db_mcq, db_tf = INS.parse_db('/home/user/uploads/بنك أسئلة مقرر قواعد البيانات  short.pdf')
     for q in db_mcq + db_tf:
         if re.search(r'شكل\s*1', q['q']):
             q['fig'] = 'db1'
@@ -421,5 +424,5 @@ if __name__ == '__main__':
                 if s['type'] == 'mcq' and any(not o for o in q['options']):
                     print('   EMPTY OPT:', c['id'], q['q'][:60])
     print('TOTAL', tot)
-    with open(paths.DATA, 'w') as f:
+    with open('/home/user/site/data.json', 'w') as f:
         json.dump(courses, f, ensure_ascii=False, indent=1)

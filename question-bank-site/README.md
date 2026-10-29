@@ -1,7 +1,7 @@
 # بنك الأسئلة التفاعلي — ميد تيرم 🎓
 
 موقع تفاعلي كامل في **ملف واحد** لحل بنوك أسئلة الميد تيرم وتصحيحها فورًا:
-**8 مقررات · 689 سؤالًا · تصحيح فوري وشرح · وضع تدريب ووضع امتحان**.
+**8 مقررات · 709 أسئلة · تصحيح فوري وشرح · وضع تدريب ووضع امتحان**.
 
 > صُنع وطُوِّر بواسطة **medo king** — [واتساب 0127 739 8832](https://wa.me/201277398832)
 
@@ -17,7 +17,7 @@
 
 ![HTML5](https://img.shields.io/badge/HTML-single--file-4f46e5?style=flat-square)
 ![No dependencies](https://img.shields.io/badge/dependencies-0-12a26b?style=flat-square)
-![Questions](https://img.shields.io/badge/questions-689-8b5cf6?style=flat-square)
+![Questions](https://img.shields.io/badge/questions-709-8b5cf6?style=flat-square)
 ![Mobile ready](https://img.shields.io/badge/mobile-ready-25d366?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
@@ -47,10 +47,10 @@
 | محاسبة متوسطة (1) | 22 | 26 | **48** | 2 |
 | تصميم برامج الحاسب الآلي | 84 | 36 | **120** | 2 |
 | الاقتصاد الكلي | 38 | 36 | **74** | 2 |
-| اقتصاديات الخدمات الحكومية | 30 | 0 | **30** | 1 |
+| اقتصاديات الخدمات الحكومية | 30 | 20 | **50** | 2 |
 | التأمين وإدارة الخطر | 50 | 64 | **114** | 10 |
 | قواعد البيانات | 80 | 42 | **122** | 10 |
-| **الإجمالي** | **391** | **298** | **689** | **31** |
+| **الإجمالي** | **391** | **318** | **709** | **32** |
 
 ## 🚀 التشغيل
 
@@ -154,7 +154,7 @@ python3 scripts/build_site.py
 ```bash
 git init
 git add .
-git commit -m "feat: بنك الأسئلة التفاعلي — 8 مقررات و689 سؤالًا"
+git commit -m "feat: بنك الأسئلة التفاعلي — 8 مقررات و709 أسئلة"
 git branch -M main
 git remote add origin https://github.com/<USERNAME>/<REPO>.git
 git push -u origin main
