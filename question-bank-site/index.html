@@ -72,6 +72,33 @@ button{font-family:inherit;touch-action:manipulation}
 .hero{padding:38px 0 10px;text-align:center}
 .hero h1{font-size:clamp(24px,4.4vw,38px);margin:0 0 10px;letter-spacing:-.5px;line-height:1.3}
 .hero p{margin:0 auto;max-width:640px;color:var(--ink-soft);font-size:16px;line-height:1.7}
+
+/* ---------- homepage developer intro ---------- */
+.hero-intro{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,310px);
+  align-items:center;gap:clamp(22px,5vw,58px);text-align:right;
+  padding:28px 0 24px;min-height:300px
+}
+.hero-intro .hero-copy{min-width:0}
+.hero-intro h1{font-size:clamp(27px,4.2vw,40px);margin:0 0 12px;letter-spacing:-.5px;line-height:1.35}
+.hero-intro p{margin:0;max-width:650px;color:var(--ink-soft);font-size:16px;line-height:1.8}
+.hero-intro .chips{justify-content:flex-start;margin-top:18px}
+.hero-portrait{
+  display:flex;align-items:flex-end;justify-content:center;align-self:stretch;
+  min-height:260px;overflow:hidden
+}
+.hero-portrait img{
+  display:block;width:100%;height:clamp(260px,31vw,360px);max-height:360px;
+  object-fit:contain;object-position:center bottom
+}
+@media(max-width:680px){
+  .hero-intro{grid-template-columns:1fr;gap:4px;text-align:center;padding:16px 0 20px}
+  .hero-intro .hero-copy{order:2}
+  .hero-intro .hero-portrait{order:1;min-height:0;height:230px}
+  .hero-intro .hero-portrait img{height:260px;max-height:260px}
+  .hero-intro .hero-copy p{margin-inline:auto;font-size:14.5px}
+  .hero-intro .chips{justify-content:center}
+}
 .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
 .chip{
   background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 15px;
@@ -682,14 +709,19 @@ function renderHome(){
     </div>` : '';
   app.innerHTML = `
   ${resume}
-  <section class="hero">
-    <h1>ذاكر، حُل، وصحّح إجاباتك فورًا</h1>
-    <p>كل أسئلة الميد تيرم في مكان واحد: أسئلة اختيار من متعدد وصح/خطأ، بتصحيح لحظي وشرح للإجابة الصحيحة، ووضع امتحان يحسب درجتك في النهاية.</p>
-    <div class="chips">
-      <span class="chip">${IC.book} ${DATA.length} مقررات</span>
-      <span class="chip">✓ ${DATA.reduce((n,c)=>n+totalQ(c),0)} سؤال محلول</span>
-      <span class="chip">${IC.bolt} تصحيح فوري</span>
-      <span class="chip">${IC.exam} وضع امتحان</span>
+  <section class="hero hero-intro">
+    <div class="hero-copy">
+      <h1>ذاكر، حُل، وصحّح إجاباتك فورًا</h1>
+      <p>كل أسئلة الميد تيرم في مكان واحد: أسئلة اختيار من متعدد وصح/خطأ، بتصحيح لحظي وشرح للإجابة الصحيحة، ووضع امتحان يحسب درجتك في النهاية.</p>
+      <div class="chips">
+        <span class="chip">${IC.book} ${DATA.length} مقررات</span>
+        <span class="chip">✓ ${DATA.reduce((n,c)=>n+totalQ(c),0)} سؤال محلول</span>
+        <span class="chip">${IC.bolt} تصحيح فوري</span>
+        <span class="chip">${IC.exam} وضع امتحان</span>
+      </div>
+    </div>
+    <div class="hero-portrait">
+      <img src="src/figures/medo-developer.png" alt="ميدو، مطوّر الموقع" width="896" height="1200" fetchpriority="high">
     </div>
   </section>
   ${reviewPanel}
