@@ -1,0 +1,41 @@
+name: Validate question bank
+
+on:
+  pull_request:
+    paths:
+      - "question-bank-site/**"
+      - ".github/workflows/validate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "question-bank-site/**"
+      - ".github/workflows/validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit question data and stable IDs
+        working-directory: question-bank-site
+        run: python3 scripts/extract/audit.py
+      - name: Rebuild the standalone website
+        working-directory: question-bank-site
+        run: python3 scripts/build_site.py
+      - name: Verify generated index is committed
+        run: git diff --exit-code -- question-bank-site/index.html
+      - name: Check embedded JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          html = Path("question-bank-site/index.html").read_text(encoding="utf-8")
+          start = html.find("<script>")
+          end = html.rfind("</script>")
+          if start < 0 or end <= start:
+              raise SystemExit("Could not locate the website script")
+          Path("/tmp/question-bank-site.js").write_text(html[start + 8:end], encoding="utf-8")
+          PY
+          node --check /tmp/question-bank-site.js

@@ -219,6 +219,29 @@ def macro_tf():
     return items
 
 
+def stable_question_id(course_id, section_id, stem):
+    """Stable ID derived from course, section, and UTF-16 question text."""
+    value = f"{course_id}|{section_id}|{(stem or '').strip()}"
+    encoded = value.encode('utf-16-le')
+    h = 14695981039346656037
+    for offset in range(0, len(encoded), 2):
+        unit = int.from_bytes(encoded[offset:offset + 2], 'little')
+        h ^= unit
+        h = (h * 1099511628211) & 0xffffffffffffffff
+    return f"{course_id}-{section_id}-{h:016x}"
+
+
+def assign_question_ids(courses):
+    for course in courses:
+        for section in course['sections']:
+            occurrences = {}
+            for question in section['questions']:
+                base = stable_question_id(course['id'], section['id'], question.get('q', ''))
+                occurrences[base] = occurrences.get(base, 0) + 1
+                suffix = f"-{occurrences[base]}" if occurrences[base] > 1 else ""
+                question['id'] = base + suffix
+
+
 def build_all():
     courses = []
 
@@ -407,6 +430,7 @@ def build_all():
                 if item.get('note'):
                     item['note'] = clean_q(item['note'])
     qa_patch.apply(courses)
+    assign_question_ids(courses)
     return courses
 
 

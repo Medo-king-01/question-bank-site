@@ -21,12 +21,20 @@ def add(kind, where, detail):
 
 
 total = 0
+seen_ids = set()
 for c in data:
     for s in c['sections']:
         for i, q in enumerate(s['questions'], 1):
             total += 1
             where = '%s/%s#%d' % (c['id'], s['id'], i)
             stem = q.get('q') or ''
+            qid = q.get('id')
+            if not isinstance(qid, str) or not qid.strip():
+                add('MISSING_ID', where, stem[:50])
+            elif qid in seen_ids:
+                add('DUPLICATE_ID', where, qid)
+            else:
+                seen_ids.add(qid)
             opts = q.get('options') or []
             note = q.get('note') or ''
 
