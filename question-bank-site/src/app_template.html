@@ -85,7 +85,7 @@ button{font-family:inherit;touch-action:manipulation}
 .hero-intro .chips{justify-content:flex-start;margin-top:18px}
 .hero-portrait{
   display:flex;align-items:flex-end;justify-content:center;align-self:stretch;
-  min-height:260px;overflow:hidden
+  min-height:260px;overflow:visible
 }
 .hero-portrait img{
   display:block;width:100%;height:clamp(260px,31vw,360px);max-height:360px;
@@ -94,7 +94,7 @@ button{font-family:inherit;touch-action:manipulation}
 @media(max-width:680px){
   .hero-intro{grid-template-columns:1fr;gap:4px;text-align:center;padding:16px 0 20px}
   .hero-intro .hero-copy{order:2}
-  .hero-intro .hero-portrait{order:1;min-height:0;height:230px}
+  .hero-intro .hero-portrait{order:1;min-height:0;height:270px;overflow:visible}
   .hero-intro .hero-portrait img{height:260px;max-height:260px}
   .hero-intro .hero-copy p{margin-inline:auto;font-size:14.5px}
   .hero-intro .chips{justify-content:center}
