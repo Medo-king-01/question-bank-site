@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p _site
           cp question-bank-site/index.html _site/index.html
+          cp -R question-bank-site/src _site/src
           touch _site/.nojekyll
           ls -la _site
       - uses: actions/upload-pages-artifact@v3
