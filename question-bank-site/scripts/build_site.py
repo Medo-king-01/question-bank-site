@@ -37,7 +37,7 @@ def main():
         figs[k] = 'data:image/png;base64,' + base64.b64encode(open(p, 'rb').read()).decode()
 
     tpl = open(os.path.join(SITE, 'app_template.html'), encoding='utf-8').read()
-    html = tpl.replace('__DATA__', json.dumps(data, ensure_ascii=False)).replace('__FIGS__', json.dumps(figs))
+    html = tpl.replace('__DATA__', json.dumps(data, ensure_ascii=False, separators=(',', ':'))).replace('__FIGS__', json.dumps(figs, separators=(',', ':')))
     out = OUT
     with open(out, 'w', encoding='utf-8') as f:
         f.write(html)

@@ -25,6 +25,8 @@ jobs:
       - name: Rebuild the standalone website
         working-directory: question-bank-site
         run: python3 scripts/build_site.py
+      - name: Verify generated index is committed
+        run: git diff --exit-code -- question-bank-site/index.html
       - name: Check embedded JavaScript syntax
         run: |
           python3 - <<'PY'
