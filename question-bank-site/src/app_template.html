@@ -616,8 +616,8 @@ $('#themeBtn').onclick = () => {
 $('#homeBtn').onclick = () => goHome();
 
 /* ---------- navigation ---------- */
-function goHome(){stopExamTimer();state.view='home';state.course=null;state.isReview=false;render();window.scrollTo(0,0);}
-function openCourse(id){stopExamTimer();state.view='course';state.isReview=false;state.course=DATA.find(c=>c.id===id);
+function goHome(){stopExamTimer();dropSession();state.view='home';state.course=null;state.isReview=false;render();window.scrollTo(0,0);}
+function openCourse(id){stopExamTimer();dropSession();state.view='course';state.isReview=false;state.course=DATA.find(c=>c.id===id);
   state.picked=state.course.sections.map(s=>s.id);render();window.scrollTo(0,0);}
 
 /* ---------- render ---------- */
@@ -671,7 +671,7 @@ function renderHome(){
       <div style="flex:1;min-width:220px">
         <b style="font-size:15px">عندك جلسة لم تكملها</b>
         <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
-          ${DATA.find(c=>c.id===sess.courseId)?.title || ''} — ${(()=>{
+          ${sess.isReview?'مراجعة الأخطاء':(DATA.find(c=>c.id===sess.courseId)?.title || '')} — ${(()=>{
             const done = Object.keys(sess.answers||{}).length;
             return done ? `${done} من ${sess.quiz.length} سؤال` : `لسه ما جاوبتش، ${sess.quiz.length} سؤال مستنيينك`;
           })()}
@@ -785,7 +785,7 @@ function buildPool(sectionIds, filterFn){
     s.items.forEach(it=>pool.push({...it,sec:s.title,secType:s.type,courseId:c.id,courseTitle:c.title}));
   });
   if(filterFn)pool=pool.filter(filterFn);
-  return state.shuffle?shuffleArr(pool):pool;
+  return pool;
 }
 function startReview(){
   const records=loadReview(),pool=[];
@@ -909,7 +909,7 @@ function renderQuiz(){
     app.innerHTML = `${bar}<div class="qlist">${state.quiz.map((q,i)=>qCard(q,i)).join('')}</div>`;
   }
 
-  $('#quitBtn').onclick = () => { openCourse(state.course.id); };
+  $('#quitBtn').onclick = () => { state.isReview ? goHome() : openCourse(state.course.id); };
   $('#finishBtn').onclick = () => finish();
   wireZoom();
 
