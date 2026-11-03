@@ -18,9 +18,13 @@ OUT = os.path.join(ROOT, 'index.html')
 def main():
     data = json.load(open(os.path.join(SITE, 'data.json'), encoding='utf-8'))
     n = 0
+    seen_ids = set()
     for c in data:
         for s in c['sections']:
             for q in s['questions']:
+                qid = q.get('id')
+                assert isinstance(qid, str) and qid and qid not in seen_ids, ('missing/duplicate question id', c['id'], s['id'], q.get('q', '')[:60])
+                seen_ids.add(qid)
                 n += 1
                 if s['type'] == 'mcq':
                     assert q.get('options') and q.get('ans') is not None, q

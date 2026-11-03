@@ -120,6 +120,7 @@ python3 scripts/extract/audit.py  # فحص سلامة البيانات: لازم
         "type": "mcq",                       // "mcq" أو "tf"
         "questions": [
           {
+            "id": "ethics-mcq-<stable-hash>",
             "q": "نص السؤال؟",
             "options": ["أ", "ب", "ج", "د"],
             "ans": 0,                        // فهرس الإجابة الصحيحة (يبدأ من 0)

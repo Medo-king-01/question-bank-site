@@ -135,6 +135,13 @@ button{font-family:inherit;touch-action:manipulation}
 .track:after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .switch input:checked + .track{background:var(--accent)}
 .switch input:checked + .track:after{inset-inline-start:22px}
+.exam-settings{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--bg2)}
+.exam-setting{display:flex;flex-direction:column;gap:6px;min-width:150px}
+.exam-setting label{font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.exam-setting select,.exam-setting input{min-height:40px;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:8px 11px;background:var(--card);color:var(--ink);font:inherit;font-size:14px}
+.exam-setting input:disabled{opacity:.5}
+.q-source{display:block;margin-top:4px;font-size:11.5px;font-weight:700;color:var(--ink-soft)}
+.pill.timer{color:var(--accent);font-variant-numeric:tabular-nums;direction:ltr}
 .primary{
   border:none;border-radius:14px;padding:15px 26px;font-weight:800;font-size:16px;cursor:pointer;
   background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;box-shadow:0 10px 24px rgba(79,70,229,.32);
@@ -461,25 +468,79 @@ const store = {
 };
 
 const SKEY = 'qb.session';
+const RKEY = 'qb.review.v1';
+function loadReview(){
+  const value = store.get(RKEY, {});
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+function recordAttempt(q, answer, course){
+  if (!q.id) return;
+  const records = loadReview();
+  const previous = records[q.id] || {
+    questionId:q.id, courseId:q.courseId || course?.id || '',
+    courseTitle:q.courseTitle || course?.title || '',
+    wrongCount:0, correctCount:0, correctStreak:0, firstWrongAt:null
+  };
+  const correct = answer === q.ans, now = Date.now();
+  previous.courseId = q.courseId || course?.id || previous.courseId;
+  previous.courseTitle = q.courseTitle || course?.title || previous.courseTitle;
+  previous.lastAttemptAt = now;
+  previous.lastOutcome = correct ? 'correct' : 'wrong';
+  if (correct){
+    previous.correctCount = (previous.correctCount || 0) + 1;
+    previous.correctStreak = (previous.correctStreak || 0) + 1;
+  } else {
+    previous.wrongCount = (previous.wrongCount || 0) + 1;
+    previous.correctStreak = 0;
+    previous.firstWrongAt = previous.firstWrongAt || now;
+    previous.lastWrongAt = now;
+  }
+  if (previous.wrongCount > 0 && previous.correctStreak < 2) records[q.id] = previous;
+  else delete records[q.id];
+  store.set(RKEY, records);
+}
+function getReviewCount(){
+  const records = loadReview(); let count = 0;
+  DATA.forEach(c=>c.sections.forEach(s=>s.questions.forEach(q=>{if(records[q.id]) count++;})));
+  return count;
+}
+function saveExamPrefs(){
+  store.set('qb.examSettings', {count:state.examCount, timerEnabled:state.timerEnabled, timerMinutes:state.timerMinutes});
+}
 function saveSession(){
   if (state.view !== 'quiz' && state.view !== 'result') { try{localStorage.removeItem(SKEY)}catch(e){} return }
   store.set(SKEY, {courseId: state.course.id, mode: state.mode, quiz: state.quiz,
-                   answers: state.answers, idx: state.idx, view: state.view});
+                   answers: state.answers, idx: state.idx, view: state.view,
+                   isReview:state.isReview, deadline:state.deadline,
+                   examRecorded:state.examRecorded, timeExpired:state.timeExpired});
 }
 function loadSession(){ return store.get(SKEY, null) }
 function validSession(s){
   if (!s || !s.courseId || !Array.isArray(s.quiz) || !s.quiz.length) return false;
-  if (!DATA.find(c=>c.id===s.courseId)) return false;
+  if (s.courseId === '__review' ? !s.isReview : !DATA.find(c=>c.id===s.courseId)) return false;
   return s.quiz.every(q => q && typeof q.q === 'string' && Array.isArray(q.opts) && q.opts.length >= 2
                            && Number.isInteger(q.ans) && q.ans >= 0 && q.ans < q.opts.length);
 }
 function resumeSession(){
   const s = loadSession(); if (!validSession(s)) { dropSession(); renderHome(); return; }
-  state.course = DATA.find(c=>c.id===s.courseId);
+  state.isReview = !!s.isReview;
+  state.course = state.isReview
+    ? {id:'__review',title:'مراجعة الأخطاء',color:'var(--accent)',sections:[]}
+    : DATA.find(c=>c.id===s.courseId);
   state.mode = s.mode === 'exam' ? 'exam' : 'study';
-  state.quiz = s.quiz; state.answers = s.answers || {};
+  state.quiz = s.quiz.map(q=>{
+    const match = q.id ? null : DATA.find(c=>c.id===(q.courseId||s.courseId))?.sections
+      .flatMap(sec=>sec.items).find(item=>item.q===q.q && item.ans===q.ans);
+    return {...q, id:q.id || match?.id, courseId:q.courseId || match?.courseId || s.courseId,
+            courseTitle:q.courseTitle || match?.courseTitle || state.course.title};
+  });
+  state.answers = s.answers || {};
   state.idx = Math.min(Math.max(0, s.idx || 0), s.quiz.length - 1);
-  state.view = s.view === 'result' ? 'result' : 'quiz'; render(); window.scrollTo(0,0);
+  state.deadline = Number.isFinite(s.deadline) ? s.deadline : null;
+  state.examRecorded = !!s.examRecorded;
+  state.timeExpired = !!s.timeExpired;
+  state.view = s.view === 'result' ? 'result' : 'quiz';
+  render(); window.scrollTo(0,0);
 }
 function dropSession(){ try{localStorage.removeItem(SKEY)}catch(e){} }
 
@@ -487,18 +548,42 @@ function dropSession(){ try{localStorage.removeItem(SKEY)}catch(e){} }
 DATA.forEach(c => c.sections.forEach(s => {
   s.items = s.questions.map(raw => {
     if (s.type === 'mcq') {
-      return {q: raw.q, opts: raw.options.slice(), ans: raw.ans,
+      return {id:raw.id, q: raw.q, opts: raw.options.slice(), ans: raw.ans,
               note: raw.note || '', fig: raw.fig || null};
     }
-    return {q: raw.q, opts: ['صح', 'خطأ'], ans: raw.ans ? 0 : 1,
+    return {id:raw.id, q: raw.q, opts: ['صح', 'خطأ'], ans: raw.ans ? 0 : 1,
             note: raw.note || '', fig: raw.fig || null};
   });
 }));
 
+const examPrefs = store.get('qb.examSettings', {});
 const state = {
   view: 'home', course: null, mode: 'study', picked: [], shuffle: false,
-  quiz: [], answers: {}, idx: 0, reviewed: false
+  quiz: [], answers: {}, idx: 0, reviewed: false, isReview:false,
+  examCount:['all','10','20','30','50','100'].includes(String(examPrefs.count))?String(examPrefs.count):'all',
+  timerEnabled:!!examPrefs.timerEnabled,
+  timerMinutes:Math.min(180,Math.max(1,Number(examPrefs.timerMinutes)||30)),
+  deadline:null, examRecorded:false, timeExpired:false
 };
+let examTimerHandle = null;
+function stopExamTimer(){
+  if (examTimerHandle !== null){ clearInterval(examTimerHandle); examTimerHandle = null; }
+}
+function formatRemaining(ms){
+  const seconds=Math.max(0,Math.ceil(ms/1000));
+  return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+}
+function startExamTimer(){
+  stopExamTimer();
+  if(state.view!=='quiz'||state.mode!=='exam'||!state.deadline)return;
+  const tick=()=>{
+    const left=Math.max(0,state.deadline-Date.now()),pill=$('#timerPill');
+    if(pill)pill.textContent=formatRemaining(left);
+    if(left<=0){stopExamTimer();finish(true);}
+  };
+  tick();
+  if(state.view==='quiz')examTimerHandle=setInterval(tick,1000);
+}
 
 /* ---------- sticky metrics (mobile layout follows the real bar heights) ---------- */
 function syncBars(){
@@ -531,9 +616,9 @@ $('#themeBtn').onclick = () => {
 $('#homeBtn').onclick = () => goHome();
 
 /* ---------- navigation ---------- */
-function goHome(){ state.view='home'; state.course=null; render(); window.scrollTo(0,0); }
-function openCourse(id){ state.view='course'; state.course = DATA.find(c=>c.id===id);
-  state.picked = state.course.sections.map(s=>s.id); render(); window.scrollTo(0,0); }
+function goHome(){stopExamTimer();state.view='home';state.course=null;state.isReview=false;render();window.scrollTo(0,0);}
+function openCourse(id){stopExamTimer();state.view='course';state.isReview=false;state.course=DATA.find(c=>c.id===id);
+  state.picked=state.course.sections.map(s=>s.id);render();window.scrollTo(0,0);}
 
 /* ---------- render ---------- */
 function render(){
@@ -548,6 +633,17 @@ function totalQ(c){ return c.sections.reduce((n,s)=>n+s.items.length,0); }
 
 function renderHome(){
   const best = store.get('qb.best', {});
+  const reviewCount = getReviewCount();
+  const reviewPanel = `
+    <div class="setup" style="margin:0 0 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:220px">
+        <b style="font-size:15px">مراجعة الأخطاء</b>
+        <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
+          ${reviewCount ? `لديك ${reviewCount} سؤال يحتاج إلى مراجعة` : 'لا توجد أسئلة مسجلة للمراجعة حاليًا'}
+        </div>
+      </div>
+      <button class="primary" id="reviewBtn" style="padding:12px 20px;font-size:14.5px" ${reviewCount?'':'disabled'}>ابدأ المراجعة</button>
+    </div>`;
   const cards = DATA.map(c => {
     const mcqN = c.sections.filter(s=>s.type==='mcq').reduce((n,s)=>n+s.items.length,0);
     const tfN = c.sections.filter(s=>s.type==='tf').reduce((n,s)=>n+s.items.length,0);
@@ -596,7 +692,9 @@ function renderHome(){
       <span class="chip">${IC.exam} وضع امتحان</span>
     </div>
   </section>
+  ${reviewPanel}
   <div class="grid">${cards}</div>`;
+  if ($('#reviewBtn')) $('#reviewBtn').onclick = startReview;
   if ($('#resumeBtn')) $('#resumeBtn').onclick = resumeSession;
   if ($('#dropBtn')) $('#dropBtn').onclick = () => { dropSession(); renderHome(); };
 }
@@ -636,8 +734,23 @@ function renderCourse(){
     <div class="label">خيارات</div>
     <label class="switch"><input type="checkbox" id="shuffleChk" ${state.shuffle?'checked':''}><span class="track"></span> ترتيب عشوائي للأسئلة</label>
 
+    <div class="exam-settings" id="examSettings" style="${state.mode==='exam'?'':'display:none'}">
+      <div class="exam-setting">
+        <label for="examCount">عدد أسئلة الامتحان</label>
+        <select id="examCount">
+          <option value="all" ${state.examCount==='all'?'selected':''}>كل الأسئلة (${nSel})</option>
+          ${[10,20,30,50,100].map(n=>`<option value="${n}" ${state.examCount===String(n)?'selected':''}>${n} سؤال</option>`).join('')}
+        </select>
+      </div>
+      <label class="switch"><input type="checkbox" id="timerChk" ${state.timerEnabled?'checked':''}><span class="track"></span>تفعيل مؤقت الامتحان</label>
+      <div class="exam-setting" id="timerDuration">
+        <label for="timerMinutes">مدة الامتحان بالدقائق</label>
+        <input type="number" id="timerMinutes" min="1" max="180" value="${state.timerMinutes}" ${state.timerEnabled?'':'disabled'}>
+      </div>
+    </div>
+
     <div class="row" style="margin-top:22px">
-      <button class="primary" id="startBtn" ${nSel?'':'disabled'}>ابدأ الحل (${nSel} سؤال)</button>
+      <button class="primary" id="startBtn" ${nSel?'':'disabled'}>ابدأ الحل (${state.mode==='exam' && state.examCount!=='all'?Math.min(Number(state.examCount),nSel):nSel} سؤال)</button>
       ${best?`<span style="color:var(--ink-soft);font-size:13.5px">أفضل نتيجة: ${best}%</span>`:''}
     </div>
   </div>`;
@@ -654,25 +767,49 @@ function renderCourse(){
     state.mode = m.dataset.mode; renderCourse();
   };
   $('#shuffleChk').onchange = e => { state.shuffle = e.target.checked; };
+  const updateStartLabel=()=>{
+    const count=state.mode==='exam'&&state.examCount!=='all'?Math.min(Number(state.examCount),nSel):nSel;
+    $('#startBtn').textContent=`ابدأ الحل (${count} سؤال)`;
+  };
+  $('#examCount').onchange=e=>{state.examCount=e.target.value;saveExamPrefs();updateStartLabel();};
+  $('#timerChk').onchange=e=>{state.timerEnabled=e.target.checked;$('#timerMinutes').disabled=!state.timerEnabled;saveExamPrefs();};
+  $('#timerMinutes').onchange=e=>{state.timerMinutes=Math.min(180,Math.max(1,Number(e.target.value)||30));e.target.value=state.timerMinutes;saveExamPrefs();};
   $('#startBtn').onclick = () => startQuiz();
 }
 
 function shuffleArr(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
 
 function buildPool(sectionIds, filterFn){
-  const c = state.course;
-  let pool = [];
+  const c=state.course;let pool=[];
   c.sections.filter(s=>sectionIds.includes(s.id)).forEach(s=>{
-    s.items.forEach(it => pool.push({...it, sec: s.title, secType: s.type}));
+    s.items.forEach(it=>pool.push({...it,sec:s.title,secType:s.type,courseId:c.id,courseTitle:c.title}));
   });
-  if (filterFn) pool = pool.filter(filterFn);
-  return state.shuffle ? shuffleArr(pool) : pool;
+  if(filterFn)pool=pool.filter(filterFn);
+  return state.shuffle?shuffleArr(pool):pool;
 }
-
-function startQuiz(pool){
-  state.quiz = pool || buildPool(state.picked);
-  state.answers = {}; state.idx = 0; state.view = 'quiz'; state.reviewed = false;
-  render(); window.scrollTo(0,0);
+function startReview(){
+  const records=loadReview(),pool=[];
+  DATA.forEach(c=>c.sections.forEach(s=>s.items.forEach(it=>{
+    if(records[it.id])pool.push({...it,sec:s.title,secType:s.type,courseId:c.id,courseTitle:c.title,reviewRecord:records[it.id]});
+  })));
+  pool.sort((a,b)=>(a.reviewRecord.lastWrongAt||0)-(b.reviewRecord.lastWrongAt||0));
+  if(!pool.length){renderHome();return;}
+  stopExamTimer();state.course={id:'__review',title:'مراجعة الأخطاء',color:'var(--accent)',sections:[]};
+  state.mode='study';state.isReview=true;state.quiz=pool;state.answers={};state.idx=0;state.view='quiz';
+  state.reviewed=false;state.deadline=null;state.examRecorded=false;state.timeExpired=false;
+  render();window.scrollTo(0,0);
+}
+function startQuiz(pool,options={}){
+  let selected=pool?pool.slice():buildPool(state.picked);
+  if(!pool&&state.mode==='exam'&&state.examCount!=='all'){
+    const limit=Math.min(selected.length,Math.max(1,Number(state.examCount)||selected.length));
+    if(limit<selected.length){const chosen=new Set(shuffleArr(selected.map((_,i)=>i)).slice(0,limit));selected=selected.filter((_,i)=>chosen.has(i));}
+  }
+  state.quiz=state.shuffle?shuffleArr(selected):selected;state.isReview=!!options.review;
+  state.answers={};state.idx=0;state.view='quiz';state.reviewed=false;
+  state.deadline=state.mode==='exam'&&state.timerEnabled?Date.now()+state.timerMinutes*60000:null;
+  state.examRecorded=false;state.timeExpired=false;stopExamTimer();
+  render();window.scrollTo(0,0);
 }
 
 /* ---------- quiz ---------- */
@@ -720,7 +857,7 @@ function qCard(q, i, opts={}){
       <button class="mini" data-reset="${i}">مسح الاختيار</button>
     </div>`;
   return `<article class="q" id="q${i}">
-    <div class="q-head"><div class="qnum">${i+1}</div><div class="qtext">${q.q}</div></div>
+    <div class="q-head"><div class="qnum">${i+1}</div><div class="qtext">${q.q}${state.isReview?`<span class="q-source">${q.courseTitle||''} · ${q.sec||''}</span>`:''}</div></div>
     ${fig}
     <div class="opts">${options}</div>
     ${fb}${extra}
@@ -743,6 +880,7 @@ function renderQuiz(){
     <button class="icon-btn ghost" id="quitBtn" title="خروج">✕<span class="lbl"> خروج</span></button>
     <div class="progress"><i style="width:${pct}%"></i></div>
     <div class="counters">
+      ${exam&&state.deadline?'<span class="pill timer" id="timerPill">--:--</span>':''}
       <span class="pill">${done} / ${total}</span>
       ${exam ? '' : `<span class="pill ok">✓ ${ok}</span><span class="pill bad">✕ ${bad}</span>`}
     </div>
@@ -780,17 +918,19 @@ function renderQuiz(){
       const i = +btn.dataset.q, o = +btn.dataset.o;
       if (state.mode==='study' && state.answers[i]!==undefined) return;
       state.answers[i] = o;
+      if(state.mode==='study')recordAttempt(state.quiz[i],o,state.course);
       if (state.mode==='study'){ renderQuiz(); keepScroll(i); }
       else { renderQuiz(); }
     };
   });
   document.querySelectorAll('[data-reveal]').forEach(b => b.onclick = () => {
     const i = +b.dataset.reveal;
-    if (state.answers[i] === undefined) { state.answers[i] = -1; renderQuiz(); keepScroll(i); }
+    if (state.answers[i] === undefined) { state.answers[i] = -1; recordAttempt(state.quiz[i],-1,state.course); renderQuiz(); keepScroll(i); }
   });
   document.querySelectorAll('[data-reset]').forEach(b => b.onclick = () => {
     const i = +b.dataset.reset; delete state.answers[i]; renderQuiz(); keepScroll(i);
   });
+  startExamTimer();
 }
 
 function openLightbox(key){
@@ -819,14 +959,20 @@ function keepScroll(i){
 }
 
 /* ---------- result ---------- */
-function finish(){
-  state.view = 'result'; state.reviewed = true;
-  const {ok,bad} = scoreNow();
-  const total = state.quiz.length;
-  const pct = total ? Math.round(ok/total*100) : 0;
-  const best = store.get('qb.best', {});
-  if (!best[state.course.id] || pct > best[state.course.id]) { best[state.course.id] = pct; store.set('qb.best', best); }
-  render(); window.scrollTo(0,0);
+function finish(timeExpired=false){
+  if(state.view==='result')return;
+  stopExamTimer();if(timeExpired)state.timeExpired=true;
+  if(state.mode==='exam'&&!state.examRecorded){
+    state.quiz.forEach((q,i)=>recordAttempt(q,state.answers[i]===undefined?-1:state.answers[i],state.course));
+    state.examRecorded=true;
+  }
+  state.view='result';state.reviewed=true;
+  const {ok,bad}=scoreNow(),total=state.quiz.length,pct=total?Math.round(ok/total*100):0;
+  const best=store.get('qb.best',{});
+  if(!state.isReview&&(!best[state.course.id]||pct>best[state.course.id])){
+    best[state.course.id]=pct;store.set('qb.best',best);
+  }
+  render();window.scrollTo(0,0);
 }
 
 function renderResult(){
@@ -836,20 +982,22 @@ function renderResult(){
   const pct = total? Math.round(ok/total*100) : 0;
   const color = pct>=80 ? 'var(--ok)' : pct>=50 ? '#f59e0b' : 'var(--bad)';
   const msg = pct>=90 ? 'ممتاز جدًا! جاهز للميد تيرم 🎉' : pct>=75 ? 'نتيجة قوية، كمّل مراجعة الأخطاء 💪' : pct>=50 ? 'أساس جيد — راجع الأسئلة التي أخطأت فيها.' : 'محاولة أولى، ركّز على المراجعة ثم أعد المحاولة.';
-  const wrong = state.quiz.map((q,i)=>({q,i,a:state.answers[i]})).filter(x=>x.a!==undefined && x.a!==x.q.ans);
+  const wrong = state.quiz.map((q,i)=>({q,i,a:state.answers[i]}))
+    .filter(x=>x.a===undefined||x.a===-1||x.a!==x.q.ans);
   const skipped = state.quiz.filter((q,i)=>state.answers[i]===undefined || state.answers[i]===-1).length;
   const review = wrong.map(({q,i,a})=>`
     <div class="rev-item">
       <div class="rev-q">${i+1}. ${q.q}</div>
-      <div class="rev-line bad"><b>إجابتك:</b> <span>${a===-1?'لم تحل السؤال':q.opts[a]}</span></div>
+      ${q.courseTitle?`<div class="rev-line"><b>المقرر:</b> <span>${q.courseTitle}</span></div>`:''}
+      <div class="rev-line bad"><b>إجابتك:</b> <span>${a===undefined||a===-1?'لم تحل السؤال':q.opts[a]}</span></div>
       <div class="rev-line ok"><b>الصحيحة:</b> <span>${q.opts[q.ans]}</span></div>
       ${q.note?`<div class="rev-line" style="color:var(--ink-soft)"><b>ملاحظة:</b> <span>${q.note}</span></div>`:''}
     </div>`).join('');
   app.innerHTML = `
   <div class="result">
     <div class="ring" style="--p:${pct};--rc:${color}"><div><b style="color:${color}">${pct}%</b><span>${ok} من ${total}</span></div></div>
-    <h2 class="rtitle">${msg}</h2>
-    <p class="rsub">${state.course.title}${skipped?` • ${skipped} سؤال بدون إجابة`:''}</p>
+    <h2 class="rtitle">${state.timeExpired?'انتهى وقت الامتحان':msg}</h2>
+    <p class="rsub">${state.course.title}${state.timeExpired?' • تم تسليم الإجابات تلقائيًا':''}${skipped?` • ${skipped} سؤال بدون إجابة`:''}</p>
     <div class="rstats">
       <div class="rstat"><b style="color:var(--ok)">${ok}</b><span>صحيحة</span></div>
       <div class="rstat"><b style="color:var(--bad)">${bad}</b><span>خاطئة</span></div>
@@ -858,13 +1006,13 @@ function renderResult(){
     <div class="actions">
       <button class="primary" id="againAll">إعادة كل الأسئلة</button>
       ${wrong.length?`<button class="ghost-btn" id="againWrong">إعادة الأخطاء فقط (${wrong.length})</button>`:''}
-      <button class="ghost-btn" id="backCourse">رجوع للمقرر</button>
+      <button class="ghost-btn" id="backCourse">${state.isReview?'العودة للرئيسية':'رجوع للمقرر'}</button>
     </div>
     ${wrong.length?`<div class="review"><h3>مراجعة الأخطاء</h3>${review}</div>`:''}
   </div>`;
-  $('#againAll').onclick = () => startQuiz(state.quiz.slice());
-  if ($('#againWrong')) $('#againWrong').onclick = () => startQuiz(wrong.map(w=>w.q));
-  $('#backCourse').onclick = () => openCourse(state.course.id);
+  $('#againAll').onclick=()=>startQuiz(state.quiz.slice(),{review:state.isReview});
+  if($('#againWrong'))$('#againWrong').onclick=()=>startQuiz(wrong.map(w=>w.q),{review:state.isReview});
+  $('#backCourse').onclick=()=>state.isReview?goHome():openCourse(state.course.id);
 }
 
 /* ---------- keyboard ---------- */
