@@ -227,7 +227,7 @@ jobs:
           from pathlib import Path
           p = Path("src/app_template.html")
           s = p.read_text(encoding="utf-8")
-          needle = "    if ((rec.due || 0) > now) continue;\n    if (!ITEMS[rec.id]) continue;                  // question left the bank"
+          needle = "    if ((rec.due || 0) > now) continue;\n    /* The map key is the id; rec.id is only a mirror"
           assert needle in s, "dueCount changed - update this mutation"
           p.write_text(s.replace(needle, "    if (rec.level >= MASTERY_STABLE) continue;\n" + needle, 1), encoding="utf-8")
           PY
