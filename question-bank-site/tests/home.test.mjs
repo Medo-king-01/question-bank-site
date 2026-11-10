@@ -7,9 +7,11 @@
  * and, where a number is shown, compares it against computeAnalytics() rather
  * than a hard-coded guess — the home page must never invent its own maths.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   group, it, assert, eq, includes, excludes,
-  boot, ev, clickCourse, startQuizByClick, text,
+  boot, ev, ROOT, clickCourse, startQuizByClick, text,
 } from './harness.mjs';
 
 /* Section order on the rendered page, by class. */
@@ -261,6 +263,103 @@ group('HOME · course list', () => {
     const bars = [...document.querySelectorAll('.cc-acc')];
     eq(bars.length, 1, 'exactly one course has attempts, so one bar expected');
     assert(bars[0].parentElement.dataset.course === 'acct', 'bar attached to the wrong course');
+  });
+});
+
+group('HOME · progress grid', () => {
+  /* Simulate CSS Grid auto-placement the way the browser does it, because
+     jsdom has no layout engine and "the pill looks lower" is not a test.
+     Mirrors the spec order: explicitly positioned items claim their cells
+     first, then auto items fill the remaining space in document order. */
+  const layout = (children, cols) => {
+    const occupied = new Set();
+    const placed = new Map();
+    for (const [i, kind] of children.entries()) {
+      if (kind !== 'streak' || kind.row == null) continue;
+      for (let c = 1; c <= cols; c++) occupied.add(`${kind.row}:${c}`);
+      /* Record every column it occupies: the row-count assertions below read
+         the model back, and a pinned streak spanning the row owns all of it. */
+      placed.set(i, { row: kind.row, col: 1, span: cols });
+    }
+    let row = 1, col = 1;
+    for (const [i, kind] of children.entries()) {
+      if (placed.has(i)) continue;
+      const span = kind === 'streak' ? cols : 1;
+      for (;;) {
+        if (col + span - 1 > cols) { row++; col = 1; continue; }
+        const cells = Array.from({ length: span }, (_, k) => `${row}:${col + k}`);
+        if (cells.some((c) => occupied.has(c))) { col++; continue; }
+        cells.forEach((c) => occupied.add(c));
+        placed.set(i, { row, col });
+        col += span;
+        break;
+      }
+    }
+    const rows = {};
+    for (const [, p] of placed) {
+      for (let k = 0; k < (p.span || 1); k++) (rows[p.row] ||= []).push(p.col + k);
+    }
+    return rows;
+  };
+
+  it('keeps the streak last in DOM order, after all four statistics', () => {
+    const { document, window } = boot();
+    window.localStorage.setItem('qb.history.v1', JSON.stringify({
+      v: 1, sessions: [], streak: { current: 4, best: 9 }, attempts: [],
+    }));
+    ev(window, 'renderHome()');
+
+    const progress = document.querySelector('.hm-progress');
+    const kinds = [...progress.children].map((el) =>
+      (el.classList.contains('hm-streak') ? 'streak' : 'stat'));
+    eq(kinds, ['stat', 'stat', 'stat', 'stat', 'streak'], 'streak must follow the stats');
+  });
+
+  it('does not pin the streak to a row, so 2x2 stays a 2x2', () => {
+    /* The regression this guards: `grid-row:2` makes the streak claim row 2
+       before auto-placement runs, so at two columns a statistic gets stranded
+       on a third row and the block stops being an even 2x2.
+       This reads the stylesheet, not the rendered DOM: the streak only renders
+       when a history exists, and an earlier version of this test returned
+       early in that case -- passing silently against a pinned rule. */
+    const sheet = readFileSync(join(ROOT, 'index.html'), 'utf8');
+    const css = sheet.slice(sheet.indexOf('<style>'), sheet.indexOf('</style>'));
+    const at = css.indexOf('.hm-streak{');
+    assert(at > -1, 'the .hm-streak rule is missing from the stylesheet');
+    const decl = css.slice(at, css.indexOf('}', at));
+
+    assert(!/grid-row\s*:/.test(decl),
+      'the streak must not declare an explicit grid-row: it would claim a row '
+      + 'before auto-placement and break the 2x2 block at two columns');
+    assert(/grid-column\s*:\s*1\s*\/\s*-1/.test(decl),
+      'the streak must still span the full row so it never sits beside a stat');
+  });
+
+  it('lays out as a 2x2 block with the streak underneath at two columns', () => {
+    const kinds = ['stat', 'stat', 'stat', 'stat', { streak: true }];
+    const standard = layout(kinds, 2);
+    eq(Object.keys(standard).length, 3, 'two stats rows plus one streak row');
+    eq(standard[1].length, 2, 'row 1 holds two stats');
+    eq(standard[2].length, 2, 'row 2 holds the other two stats');
+    eq(standard[3].length, 1, 'the streak sits alone on row 3');
+  });
+
+  it('would fail the 2x2 block if the streak were pinned to row 2', () => {
+    /* Proves the assertion above has teeth: the pinned variant is modelled
+       too, and it must produce the broken layout. */
+    const pinned = layout(['stat', 'stat', 'stat', 'stat', { streak: true, row: 2 }], 2);
+    /* The streak claims row 2, so the third stat cannot complete the block and
+       spills to row 3 by itself -- one stat stranded on its own row, which is
+       exactly the ragged layout the reviewer spotted. */
+    eq(Object.keys(pinned).length, 3, 'pinning produces three rows instead of two');
+    eq(pinned[3].length, 1, 'a statistic is stranded on its own row');
+    eq(pinned[3].length < pinned[2].length, true, 'the block is no longer an even 2x2');
+  });
+
+  it('keeps a single row of four stats plus the streak on wide screens', () => {
+    const wide = layout(['stat', 'stat', 'stat', 'stat', { streak: true }], 4);
+    eq(wide[1].length, 4, 'all four stats share row 1');
+    eq(wide[2].length, 1, 'the streak is the second row');
   });
 });
 

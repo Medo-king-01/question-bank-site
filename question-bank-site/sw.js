@@ -13,7 +13,7 @@
 /* CACHE_VERSION is filled in at build time from a hash of the generated
  * index.html, so shipping new content rolls the cache over automatically and
  * there is nothing to bump by hand. */
-const CACHE_VERSION = '27293c5717db';
+const CACHE_VERSION = '42a92cd4461f';
 const CACHE_NAME = 'question-bank-' + CACHE_VERSION;
 
 /* Everything the app needs to boot with no network. Paths are relative to the

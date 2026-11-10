@@ -335,6 +335,18 @@ jobs:
           fi
           echo "OK - the suite caught the un-cancelled Space key."
 
+      - name: Mutation check - a pinned streak row must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/streak_pinned_row.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-streak.log 2>&1; then
+            echo "::error::The suite passed with the streak pinned to row 2."
+            cat /tmp/mutant-streak.log
+            exit 1
+          fi
+          echo "OK - the suite caught the broken 2x2 progress block."
+
       - name: Mutation check - a dead timer must fail the suite
         working-directory: question-bank-site
         run: |
