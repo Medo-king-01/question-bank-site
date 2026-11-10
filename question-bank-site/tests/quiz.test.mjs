@@ -387,14 +387,45 @@ group('REVIEW · mastery queue', () => {
     eq(due[0].it.id, ev(window, 'DATA[0].sections[0].items[0].id'), 'wrong question queued');
   });
 
-  it('excludes mastered questions from the queue', () => {
+  it('a level-5 question is scheduled 28 days out, not retired', () => {
+    const { window } = boot();
+    /* Answer "now" five times so `due` is measured from today, which is what
+       the learner experiences. */
+    ev(window, `
+      const it = DATA[0].sections[0].items[0];
+      for (let i = 0; i < 5; i++) updateMastery(it, it.ans, Date.now());
+    `);
+    const rec = ev(window, 'loadMastery().items[DATA[0].sections[0].items[0].id]');
+    eq(rec.level, 5, 'level');
+    /* The interval table promises a review every 28 days at the top level,
+       so the question must keep a future date rather than disappear. */
+    eq(Math.round((rec.due - Date.now()) / 86400000), 28, 'level 5 must be due 28 days later');
+    eq(ev(window, 'dueCount(Date.now())'), 0, 'not due yet — 28 days out');
+  });
+
+  it('a level-5 question comes back for review once its 28 days pass', () => {
     const { window } = boot();
     ev(window, `
       const it = DATA[0].sections[0].items[0];
-      for (let i = 0; i < 5; i++) updateMastery(it, it.ans, Date.now() - 60 * 86400000);
+      for (let i = 0; i < 5; i++) updateMastery(it, it.ans, Date.now());
+      /* jump the clock past the 28-day appointment */
+      const m = loadMastery();
+      m.items[it.id].due = Date.now() - 1000;
+      store.set('qb.mastery.v1', m);
     `);
-    eq(ev(window, 'loadMastery().items[DATA[0].sections[0].items[0].id].level'), 5, 'level');
-    eq(ev(window, 'dueCount(Date.now())'), 0, 'mastered question still due');
+    eq(ev(window, 'dueCount(Date.now())'), 1, 'an overdue level-5 question must be due again');
+    eq(ev(window, 'dueQuestions(Date.now())').length, 1, 'and must be in the queue');
+    eq(ev(window, 'dueQuestions(Date.now())[0].rec.level'), 5, 'still level 5');
+  });
+
+  it('a stable question that is not yet due stays out of the queue', () => {
+    const { window } = boot();
+    ev(window, `
+      const it = DATA[0].sections[0].items[0];
+      for (let i = 0; i < 5; i++) updateMastery(it, it.ans, Date.now());
+    `);
+    eq(ev(window, 'dueCount(Date.now())'), 0, 'not due for 28 days');
+    eq(ev(window, 'dueQuestions(Date.now())').length, 0, 'queue empty');
   });
 
   it('shows the mastery breakdown on the home screen', () => {

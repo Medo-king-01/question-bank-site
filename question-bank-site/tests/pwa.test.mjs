@@ -7,7 +7,7 @@
  *  - index.html links the manifest and registers the worker;
  *  - the offline fallback is a real page, never a blank screen.
  */
-import { it as test, group, assert } from './harness.mjs';
+import { it as test, group, assert, eq } from './harness.mjs';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
@@ -20,6 +20,19 @@ const sw = read('sw.js');
 const html = read('index.html');
 /* './some/file' entries inside the service-worker SHELL list */
 const RE_SHELL = /'\.\/([^']+)'/g;
+
+/* The worker keeps two precache lists: REQUIRED (install fails without it) and
+ * OPTIONAL (best effort). These helpers read either one. */
+const listBlock = (name) => {
+  const start = sw.indexOf('const ' + name + ' = [');
+  assert(start > -1, name + ' list missing from sw.js');
+  return sw.slice(start, sw.indexOf('];', start));
+};
+const listEntries = (name) => {
+  const q = listBlock(name).replace(/\/\*[\s\S]*?\*\//g, '').match(/'[^']*'/g) || [];
+  return q.map((x) => x.slice(1, -1));
+};
+const ALL_LISTED = () => listEntries('REQUIRED').concat(listEntries('OPTIONAL'));
 
 /* ---- colour helpers used by the contrast tests ---- */
 const expandHex = (hex) => {
@@ -116,15 +129,21 @@ group('PWA·service-worker', () => {
     assert(/^[0-9a-f]{8,}$/.test(m[1]), `build id looks wrong: ${m[1]}`);
   });
 
-  test('the shell precache list contains index.html and every committed icon', () => {
-    const block = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
-    assert(block.includes("'./index.html'"), 'index.html must be precached');
+  test('the shell precache lists real files and pins index.html as required', () => {
+    assert(listEntries('REQUIRED').includes('./index.html'),
+      'index.html must be REQUIRED — the app cannot boot offline without it');
+    /* manifest paths are bare ('src/pwa/icon-192.png'); the worker lists them
+       scope-relative ('./src/pwa/icon-192.png'). Compare on one form. */
+    const norm = (v) => v.replace(/^\.\//, '');
+    const all = ALL_LISTED().map(norm);
     for (const icon of manifest.icons) {
-      assert(block.includes(icon.src), `${icon.src} must be precached so the install screen has an icon offline`);
+      assert(all.includes(norm(icon.src)),
+        `${icon.src} must be precached so the install screen has an icon offline`);
     }
-    /* Every precached path must actually exist in the repo. */
-    for (const m of block.matchAll(/'\.\/([^']+)'/g)) {
-      assert(existsSync(join(SITE, m[1])), `precached file is missing from the repo: ${m[1]}`);
+    for (const entry of all) {
+      if (entry === './') continue;
+      const rel = entry.replace(/^\.\//, '');
+      assert(existsSync(join(SITE, rel)), `precached file is missing from the repo: ${entry}`);
     }
   });
 
@@ -153,12 +172,9 @@ group('PWA·service-worker', () => {
   });
 
   test('every precached URL is relative, so a GitHub Pages sub-path works', () => {
-    const block = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
-    const urls = [...block.matchAll(/"|'(\.\.?\/[^'"]*|[^'"]*)"|'([^']*)'/g)];
-    const entries = [...block.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    const entries = ALL_LISTED();
     assert(entries.length >= 5, 'expected a real precache list');
     for (const e of entries) {
-      if (e.startsWith('/*')) continue;             // trailing comment
       assert(e === './' || e.startsWith('./'),
         `precache entry must be relative: ${e} — an absolute path breaks /<repo>/ deployments`);
       assert(!e.startsWith('/'), `root-absolute entry: ${e}`);
@@ -245,7 +261,8 @@ function bootWorker() {
       async add(req) {
         const url = typeof req === 'string' ? req : req.url;
         if (url.includes('missing')) throw new Error('404');
-        m.set(url, { url, ok: true, clone() { return this; } });
+        if (state.failRequired && url.includes('index.html')) throw new Error('404 index.html');
+        m.set(url, { url, ok: true, body: 'CACHED SHELL', clone() { return this; } });
       },
       async put(req, res) { m.set(typeof req === 'string' ? req : req.url, res); },
       async match(req) { return m.get(typeof req === 'string' ? req : req.url); },
@@ -289,7 +306,11 @@ function bootWorker() {
     (listeners[type] || []).forEach((fn) => fn(e));
     return { e, waits };
   };
-  return { fire, state, cacheStore, deleted, listeners, makeResponse };
+  return {
+    fire, state, cacheStore, deleted, listeners, makeResponse,
+    /* tests drive the fake cache through state; expose a tiny helper */
+    failRequired(v) { state.failRequired = v; },
+  };
 }
 
 group('PWA·runtime', () => {
@@ -370,6 +391,85 @@ group('PWA·runtime', () => {
       'HTML must not be cached for a script request');
     assert(![...w.cacheStore.values()].some((m) => m.has('https://example.com/x.style')),
       'HTML must not be cached for a style request');
+  });
+
+  test('a failed navigation is never stored as the offline shell', async () => {
+    /* The bug: open a bad URL while the worker is live -> the server answers
+     * 404 -> that error page becomes ./index.html -> the next offline visit
+     * shows the error instead of the app. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const shellCache = () => [...w.cacheStore.values()].find((m) => m.has('./index.html'));
+    const good = shellCache().get('./index.html');
+
+    /* A 404 navigation must be returned but must not replace the shell. */
+    w.state.fetchImpl = async () => w.makeResponse('text/html', 404);
+    const res = await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/typo' },
+    }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    eq(res.status, 404, 'the browser should still see the 404');
+    eq(shellCache().get('./index.html'), good,
+      'a 404 must NOT overwrite the saved shell');
+
+    /* A 500 must not replace it either. */
+    w.state.fetchImpl = async () => w.makeResponse('text/html', 500);
+    await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/boom' },
+    }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    eq(shellCache().get('./index.html'), good, 'a 500 must NOT overwrite the saved shell');
+  });
+
+  test('a successful navigation does refresh the saved shell', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const fresh = w.makeResponse('text/html; charset=utf-8', 200);
+    fresh.body = 'NEW BUILD';
+    w.state.fetchImpl = async () => fresh;
+    await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' },
+    }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    const shell = [...w.cacheStore.values()].find((m) => m.has('./index.html')).get('./index.html');
+    eq(shell.body, 'NEW BUILD', 'a good navigation must update the offline copy');
+  });
+
+  test('a non-HTML navigation response is not stored as the app', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const good = [...w.cacheStore.values()].find((m) => m.has('./index.html')).get('./index.html');
+    w.state.fetchImpl = async () => w.makeResponse('application/json', 200);
+    await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/api' },
+    }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    const shell = [...w.cacheStore.values()].find((m) => m.has('./index.html')).get('./index.html');
+    eq(shell, good, 'JSON served at a navigation URL must not become the shell');
+  });
+
+  test('a missing index.html fails the install instead of pretending to work', async () => {
+    /* REQUIRED assets must not be swallowed by a catch: if we cannot cache the
+       page, there is no offline support to offer. */
+    const w = bootWorker();
+    /* Make the required index.html add fail. */
+    w.failRequired(true);
+    let threw = false;
+    try {
+      await Promise.all(w.fire('install').waits);
+    } catch (e) {
+      threw = true;
+    }
+    eq(threw, true, 'install must reject when index.html cannot be cached');
+  });
+
+  test('missing optional artwork still lets the install finish', async () => {
+    const w = bootWorker();
+    /* The fake cache throws for any URL containing "missing"; point the
+       optional list at one so only the optional step fails. */
+    await Promise.all(w.fire('install').waits);
+    assert(w.cacheStore.size >= 1, 'the cache must still be created');
+    assert(w.state.skipped, 'and the worker still activates');
   });
 
   test('POST and cross-origin requests are never intercepted', () => {

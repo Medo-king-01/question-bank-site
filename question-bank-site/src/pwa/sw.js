@@ -18,10 +18,20 @@ const CACHE_NAME = 'question-bank-' + CACHE_VERSION;
 
 /* Everything the app needs to boot with no network. Paths are relative to the
  * service worker scope, so the site works both at a domain root and under a
- * GitHub Pages sub-path. */
-const SHELL = [
-  './',
+ * GitHub Pages sub-path.
+ *
+ * REQUIRED: without these the app cannot boot offline, so a failure to cache
+ * them must fail the whole install. Claiming offline support while the page
+ * itself is missing is worse than not installing at all — the previously
+ * installed worker stays in charge and keeps working.
+ *
+ * OPTIONAL: icons and artwork. A 404 here must never block the install. */
+const REQUIRED = [
   './index.html',
+];
+
+const OPTIONAL = [
+  './',
   './manifest.json',
   './src/pwa/icon-192.png',
   './src/pwa/icon-512.png',
@@ -34,9 +44,16 @@ const SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // addAll fails the whole install if any single asset 404s, so add them
-    // individually and ignore the ones that are missing.
-    await Promise.all(SHELL.map(async (url) => {
+
+    /* Required assets: no catch. A throw here aborts the install, which is the
+       honest outcome — no offline promise we cannot keep. */
+    for (const url of REQUIRED) {
+      await cache.add(new Request(url, { cache: 'reload' }));
+    }
+
+    /* Optional assets: best effort, one at a time so a single 404 cannot
+       reject the batch. */
+    await Promise.all(OPTIONAL.map(async (url) => {
       try {
         await cache.add(new Request(url, { cache: 'reload' }));
       } catch (e) {
@@ -74,6 +91,18 @@ function cacheable(req, res) {
   return true;
 }
 
+/* Is this navigation response good enough to become the saved shell?
+ * It must be a success AND actually be an HTML document. */
+function shellWorthCaching(res, req) {
+  if (!res || !res.ok) return false;                 // 404, 500, opaque errors
+  if (res.type === 'opaqueredirect' || res.redirected) return false;
+  const type = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
+  if (!type) return true;                            // no header: trust res.ok
+  /* The shell is the single-page app, so it must be HTML. A JSON or image body
+     served at a navigation URL means we did not get the app. */
+  return type.includes('text/html') || type.includes('application/xhtml');
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -86,8 +115,18 @@ self.addEventListener('fetch', (event) => {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
-        const cache = await caches.open(CACHE_NAME);
-        cache.put('./index.html', fresh.clone());
+        /* Only a successful HTML response may replace the saved shell.
+         *
+         * Without this check a single bad URL could destroy the offline copy:
+         * open /typo -> server answers 404 -> that error page is stored as
+         * ./index.html -> the next offline visit shows the error instead of
+         * the app. So: a 4xx/5xx is returned to the browser but never cached,
+         * and a non-HTML body (an asset, a redirect stub) is not cached either.
+         */
+        if (shellWorthCaching(fresh, req)) {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put('./index.html', fresh.clone());
+        }
         return fresh;
       } catch (e) {
         const cache = await caches.open(CACHE_NAME);

@@ -201,6 +201,44 @@ jobs:
           cp /tmp/sw.bak src/pwa/sw.js
           python3 scripts/build_site.py
 
+      - name: Mutation check - caching an error page as the shell must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/pwa/sw.js")
+          s = p.read_text(encoding="utf-8")
+          needle = "if (shellWorthCaching(fresh, req)) {"
+          assert needle in s, "navigation guard changed - update this mutation"
+          p.write_text(s.replace(needle, "if (true) {"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-sw.log 2>&1; then
+            echo "::error::The suite passed while a 404 could overwrite the offline shell."
+            cat /tmp/mutant-sw.log
+            exit 1
+          fi
+          echo "OK - the suite caught the unsafe shell caching."
+
+      - name: Mutation check - retiring level 5 must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "    if ((rec.due || 0) > now) continue;\n    if (!ITEMS[rec.id]) continue;                  // question left the bank"
+          assert needle in s, "dueCount changed - update this mutation"
+          p.write_text(s.replace(needle, "    if (rec.level >= MASTERY_STABLE) continue;\n" + needle, 1), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-l5.log 2>&1; then
+            echo "::error::The suite passed while level 5 was retired from review."
+            cat /tmp/mutant-l5.log
+            exit 1
+          fi
+          echo "OK - the suite caught the retired level-5 question."
+
       - name: Mutation check - a bank-wide search must fail the suite
         working-directory: question-bank-site
         run: |
