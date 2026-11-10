@@ -21,6 +21,28 @@ const html = read('index.html');
 /* './some/file' entries inside the service-worker SHELL list */
 const RE_SHELL = /'\.\/([^']+)'/g;
 
+/* ---- colour helpers used by the contrast tests ---- */
+const expandHex = (hex) => {
+  const h = hex.replace('#', '');
+  return '#' + (h.length === 3 ? h.split('').map((c) => c + c).join('') : h.slice(0, 6));
+};
+const relLum = (hex) => {
+  const h = expandHex(hex).replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+  const f = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+/* Reads `prop: #rgb` or `prop: #rrggbb` out of a CSS block. */
+const CSS_COLOUR = (block, prop) => {
+  const m = block.match(new RegExp('(?:^|[;{\\s])' + prop + ':\\s*(#[0-9a-f]{3,8})', 'i'));
+  return m ? m[1] : null;
+};
+
+
 /* A tiny PNG header reader: width/height live in the IHDR chunk. */
 function pngSize(path) {
   const b = readFileSync(join(SITE, path));
@@ -210,6 +232,12 @@ function bootWorker() {
   const cacheStore = new Map();
   const deleted = [];
   const state = { skipped: false, claimed: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
+  /* makeResponse(type, status) builds a response with a Content-Type header */
+  const makeResponse = (type, status = 200) => ({
+    ok: status < 400, status, url: '',
+    headers: { get: (n) => (n.toLowerCase() === 'content-type' ? type : null) },
+    clone() { return this; },
+  });
 
   function makeCache() {
     const m = new Map();
@@ -261,7 +289,7 @@ function bootWorker() {
     (listeners[type] || []).forEach((fn) => fn(e));
     return { e, waits };
   };
-  return { fire, state, cacheStore, deleted, listeners };
+  return { fire, state, cacheStore, deleted, listeners, makeResponse };
 }
 
 group('PWA·runtime', () => {
@@ -307,6 +335,41 @@ group('PWA·runtime', () => {
     const res = await w.fire('fetch', { request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' } }).e.__res;
     assert(res.status === 503, 'expected 503');
     assert(/[\u0600-\u06FF]/.test(String(res.body)), 'offline message must be Arabic');
+  });
+
+  test('a GitHub Pages 404 HTML page is never cached as an image', async () => {
+    /* GitHub Pages answers a missing file with its 404 page served as
+     * 200 text/html. Caching that under an image URL shows a broken image for
+     * ever, even after the file is fixed. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.fetchImpl = async () => w.makeResponse('text/html; charset=utf-8', 200);
+    const req = { method: 'GET', mode: 'cors', destination: 'image', url: 'https://example.com/src/pwa/gone.png' };
+    await w.fire('fetch', { request: req }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    assert(![...w.cacheStore.values()].some((m) => m.has(req.url)),
+      'an HTML error page must not be stored as an image');
+
+    /* The same URL served correctly later must be cached. */
+    w.state.fetchImpl = async () => w.makeResponse('image/png', 200);
+    await w.fire('fetch', { request: req }).e.__res;
+    await new Promise((r) => setTimeout(r, 20));
+    assert([...w.cacheStore.values()].some((m) => m.has(req.url)), 'a real image must be cached');
+  });
+
+  test('wrong-type responses for scripts and styles are not cached either', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.fetchImpl = async () => w.makeResponse('text/html', 200);
+    for (const dest of ['script', 'style']) {
+      const req = { method: 'GET', mode: 'cors', destination: dest, url: `https://example.com/x.${dest}` };
+      await w.fire('fetch', { request: req }).e.__res;
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    assert(![...w.cacheStore.values()].some((m) => m.has('https://example.com/x.script')),
+      'HTML must not be cached for a script request');
+    assert(![...w.cacheStore.values()].some((m) => m.has('https://example.com/x.style')),
+      'HTML must not be cached for a style request');
   });
 
   test('POST and cross-origin requests are never intercepted', () => {
@@ -358,6 +421,103 @@ group('PWA·connection', () => {
     await new Promise((r) => setTimeout(r, 50));
     assert(!toast.classList.contains('show'), 'banner must hide when back online');
     dom.window.close();
+  });
+
+  test('the offline banner is readable in both light and dark mode', () => {
+    /* White-on-white in dark mode is an accessibility bug no DOM assertion
+     * would catch, so the actual colours are checked against WCAG. */
+    const rules = html.slice(html.indexOf('.pwa-toast{'), html.indexOf('.qsearch{'));
+    const darkAt = rules.indexOf('[data-theme="dark"] .pwa-toast');
+    assert(darkAt > -1, 'dark-mode toast rule missing');
+
+    const light = rules.slice(0, darkAt);
+    const dark = rules.slice(darkAt, rules.indexOf('}', darkAt) + 1);
+
+    const lightBg = CSS_COLOUR(light, 'background');
+    const lightFg = CSS_COLOUR(light, 'color');
+    assert(lightBg && lightFg, `light-mode toast needs explicit colours (got ${lightBg}/${lightFg})`);
+    assert(contrast(lightBg, lightFg) >= 4.5,
+      `light-mode toast contrast is ${contrast(lightBg, lightFg).toFixed(2)}:1, needs 4.5:1`);
+
+    const darkBg = CSS_COLOUR(dark, 'background');
+    const darkFg = CSS_COLOUR(dark, 'color');
+    assert(darkBg && darkFg, `dark-mode toast needs explicit colours (got ${darkBg}/${darkFg})`);
+    assert(contrast(darkBg, darkFg) >= 4.5,
+      `dark-mode toast contrast is ${contrast(darkBg, darkFg).toFixed(2)}:1, needs 4.5:1`);
+  });
+
+  test('the update button is readable in dark mode too', () => {
+    const i = html.indexOf('[data-theme="dark"] .pwa-act{');
+    assert(i > -1, 'dark-mode .pwa-act rule missing');
+    const block = html.slice(i, html.indexOf('}', i));
+    const bg = CSS_COLOUR(block, 'background');
+    const fg = CSS_COLOUR(block, 'color');
+    assert(bg && fg, `the dark-mode button needs explicit colours (got ${bg}/${fg})`);
+    assert(contrast(bg, fg) >= 4.5,
+      `dark-mode button contrast is ${contrast(bg, fg).toFixed(2)}:1, needs 4.5:1`);
+  });
+
+  test('no dark-mode text sits below 3:1 contrast', () => {
+    /* Sweeps every rule that sets both a background and a text colour and
+     * resolves the dark palette. Catches the whole class of "white on a colour
+     * that turned pale in dark mode" bugs. */
+    const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+    const dark = {
+      '--bg': '#0b1020', '--bg2': '#0f1730', '--card': '#141c33',
+      '--ink': '#eef2ff', '--ink-soft': '#9aa6c4', '--accent': '#7c8cff',
+      '--accent-soft': '#1c2445', '--ok': '#3ddc97', '--ok-soft': '#10281f',
+      '--bad': '#ff6b6b', '--bad-soft': '#2a1518',
+    };
+    const resolve = (v) => {
+      for (let i = 0; i < 3; i++) {
+        const m = v.trim().match(/^var\((--[\w-]+)\)$/);
+        if (!m || !dark[m[1]]) break;
+        v = dark[m[1]];
+      }
+      return v.trim();
+    };
+    /* A single bold glyph in a badge (the option letter) is decorative and is
+     * exempt: WCAG large-text rules apply to it, not the 4.5:1 body rule. */
+    const EXEMPT = /\.opt\.(correct|wrong) \.k/;
+
+    /* Collect declared colours first, then overlay [data-theme="dark"] rules
+     * on top of their base selector — the way the cascade actually resolves. */
+    const decl = new Map();   // selector -> { bg, fg, dark }
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      /* CSS comments sit between rules, so a selector can arrive with one
+       * glued to its front. Strip comments before looking at the selector. */
+      const rawSel = m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      if (!rawSel || rawSel.startsWith('@')) continue;
+      const body = m[2];
+      const bg = (body.match(/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/) || [])[1];
+      const fg = (body.match(/(?:^|;)\s*color\s*:\s*([^;]+)/) || [])[1];
+      if (!bg && !fg) continue;
+      const isDark = rawSel.startsWith('[data-theme="dark"]');
+      const sel = isDark ? rawSel.replace('[data-theme="dark"]', '').trim() : rawSel;
+      const cur = decl.get(sel) || {};
+      if (isDark) {
+        if (bg) cur.darkBg = bg;
+        if (fg) cur.darkFg = fg;
+        cur.dark = true;
+      } else {
+        if (bg) cur.bg = bg;
+        if (fg) cur.fg = fg;
+      }
+      decl.set(sel, cur);
+    }
+
+    const offenders = [];
+    for (const [sel, c] of decl) {
+      /* What the user actually sees in dark mode: the dark override wins. */
+      const bg = c.darkBg || c.bg;
+      const fg = c.darkFg || c.fg;
+      if (!bg || !fg) continue;
+      const bgv = resolve(bg), fgv = resolve(fg);
+      if (!/^#[0-9a-f]{3,8}$/i.test(bgv) || !/^#[0-9a-f]{3,8}$/i.test(fgv)) continue;
+      const r = contrast(bgv, fgv);
+      if (r < 3 && !EXEMPT.test(sel)) offenders.push(`${sel} ${bgv}/${fgv} = ${r.toFixed(2)}:1`);
+    }
+    assert(offenders.length === 0, 'dark-mode contrast failures: ' + offenders.join(' | '));
   });
 
   test('the app boots when serviceWorker is unavailable (older browsers, file://)', async () => {

@@ -133,7 +133,7 @@ python3 -m http.server 8000
 ├── package.json                # أدوات الاختبار فقط (jsdom) — الموقع نفسه بلا اعتماديات
 ├── .github/workflows/
 │   ├── pages.yml               # نشر تلقائي على GitHub Pages
-│   └── validate.yml            # فحص البيانات + البناء + 152 اختبارًا + فحص طفرات
+│   └── validate.yml            # فحص البيانات + البناء + 158 اختبارًا + فحص طفرات
 └── LICENSE                     # MIT
 ```
 
@@ -147,7 +147,7 @@ python3 scripts/extract/audit.py         # فحص البيانات: لازم ي�
 python3 scripts/extract/audit.py --strict # نفس الفحص + التحذيرات كأخطاء
 
 npm install --no-save jsdom              # مرة واحدة (أداة اختبار فقط)
-node tests/run.mjs                       # 153 اختبارًا سلوكيًا — لازم PASS
+node tests/run.mjs                       # 158 اختبارًا سلوكيًا — لازم PASS
 ```
 
 > **متطلب الاختبارات:** Node **22.22.2 أو أحدث** — `jsdom 31` يعتمد على واجهة `zstd` المضافة في Node 22.7. الموقع نفسه لا يحتاج Node إطلاقًا؛ القيد على أداة الاختبار فقط، والمشغّل يعطي رسالة واضحة لو الإصدار أقدم.

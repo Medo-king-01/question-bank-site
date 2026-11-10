@@ -13,7 +13,7 @@
 /* CACHE_VERSION is filled in at build time from a hash of the generated
  * index.html, so shipping new content rolls the cache over automatically and
  * there is nothing to bump by hand. */
-const CACHE_VERSION = '0a9ab35c4a84';
+const CACHE_VERSION = '7db478a60f3a';
 const CACHE_NAME = 'question-bank-' + CACHE_VERSION;
 
 /* Everything the app needs to boot with no network. Paths are relative to the
@@ -58,6 +58,22 @@ self.addEventListener('activate', (event) => {
   })());
 });
 
+/* GitHub Pages answers a missing file with its custom 404 page served as
+ * `200 text/html`. Caching that under, say, `icon-192.png` would show a broken
+ * image for ever — even after the file is fixed — because the cache outlives
+ * the deploy. Only cache a response when its type matches what was asked for. */
+function cacheable(req, res) {
+  const dest = req.destination || '';
+  const type = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
+  if (!type) return true;                       // no info: keep the old behaviour
+  if (dest === 'image') return type.startsWith('image/');
+  if (dest === 'script') return /javascript|ecmascript/.test(type);
+  if (dest === 'style') return type.startsWith('text/css');
+  if (dest === 'font') return /font|woff/.test(type);
+  /* Documents and anything else may legitimately be HTML. */
+  return true;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -89,7 +105,7 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(req);
     const network = fetch(req).then((res) => {
-      if (res && res.ok) cache.put(req, res.clone());
+      if (res && res.ok && cacheable(req, res)) cache.put(req, res.clone());
       return res;
     }).catch(() => null);
     return cached || (await network) || new Response('', { status: 504 });

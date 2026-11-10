@@ -288,20 +288,30 @@ button{font-family:inherit;touch-action:manipulation}
 .rstat{background:var(--bg2);border-radius:14px;padding:14px;text-align:center}
 .rstat b{display:block;font-size:22px}
 .rstat span{font-size:12.5px;color:var(--ink-soft);font-weight:700}
+/* The toast is dark in light mode and light in dark mode. Using --ink here
+   would flip to near-white in dark mode and make the white text invisible. */
 .pwa-toast{
   position:fixed;left:50%;bottom:18px;transform:translate(-50%,140%);z-index:90;
   display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 28px));
-  background:var(--ink);color:#fff;border-radius:14px;padding:13px 16px;
+  background:#16203a;color:#fff;border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;padding:13px 16px;
   box-shadow:0 12px 34px rgba(16,24,40,.28);transition:transform .28s ease;
   font-size:13.5px;font-weight:700;line-height:1.5
 }
+[data-theme="dark"] .pwa-toast{
+  background:#eef2ff;color:#101a33;border-color:rgba(16,26,51,.12);
+  box-shadow:0 12px 24px rgba(0,0,0,.55)
+}
 .pwa-toast.show{transform:translate(-50%,0)}
-.pwa-msg{flex:1;min-width:0}
+.pwa-msg{flex:1;min-width:0;overflow-wrap:anywhere}
 .pwa-act{
   border:0;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:13px;
   padding:9px 15px;border-radius:10px;cursor:pointer;white-space:nowrap;flex-shrink:0
 }
 .pwa-act:hover{filter:brightness(1.1)}
+/* The dark-mode accent (#7c8cff) only reaches 3:1 against white text, so the
+   button gets an explicit dark label instead. */
+[data-theme="dark"] .pwa-act{background:#4f46e5;color:#fff}
 @media (prefers-reduced-motion: reduce){ .pwa-toast{transition:none} }
 .qsearch{position:relative;display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);
   background:var(--card);border-radius:13px;padding:0 13px;transition:.15s}
@@ -385,6 +395,9 @@ button{font-family:inherit;touch-action:manipulation}
 .tabs button{border:1.5px solid var(--line);background:var(--card);border-radius:99px;padding:9px 16px;
   font-size:13.5px;font-weight:800;cursor:pointer;color:var(--ink);font-family:inherit;transition:.12s}
 .tabs button.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+/* The dark-mode accent (#7c8cff) only reaches 3:1 with white text; darken the
+   selected tab so its label stays readable. */
+[data-theme="dark"] .tabs button.sel{background:#4f46e5;color:#fff;border-color:#6d63ff}
 @media (max-width:520px){
   .an-card{padding:13px} .an-card b{font-size:22px}
   .an-days{height:80px;gap:3px} .an-day .d{font-size:9px}
