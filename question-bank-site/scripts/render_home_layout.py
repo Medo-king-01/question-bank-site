@@ -340,7 +340,6 @@ def render(width, theme="light", out="preview.png"):
             c += span
             break
 
-    # ---- paint
     bg = hex_to_rgb(tok["--bg"])
     card = hex_to_rgb(tok["--card"])
     line = hex_to_rgb(tok["--line"])
@@ -350,36 +349,78 @@ def render(width, theme="light", out="preview.png"):
     urgent_soft = hex_to_rgb(tok["--urgent-soft"])
     accent = hex_to_rgb(tok["--accent"])
 
+    # ---- geometry first, painting second.
+    # Boxes must exist before the caption is drawn: the caption reports what
+    # was measured, so it cannot disagree with the picture underneath it.
     rows = max(p["row"] for p in placed.values()) + 1
     grid_h = rows * stat_h + (rows - 1) * gap
     header = 74
-    img = Image.new("RGB", (int(width), int(grid_h + header + 46)), bg)
-    d = ImageDraw.Draw(img)
 
-    label = f"{width}px  ·  {theme}  ·  {cols} columns"
-    d.text((pad, 20), label, font=load_font(19), fill=ink)
-    note = ("2x2 + badge below" if cols == 2 and rows == 3 else f"{rows} rows")
-    d.text((pad, 45), note, font=load_font(14), fill=soft)
+    text = "7 يوم متصل"
+    tw = None  # measured after the font is built, below
 
-    top = header
+    boxes_by_index = {}
     for i, ch in enumerate(children):
         p = placed[i]
         x0 = pad + border + p["col"] * (col_w + gap)
-        y0 = top + border + p["row"] * (stat_h + gap)
+        y0 = header + border + p["row"] * (stat_h + gap)
         x1 = x0 + p["span"] * col_w + (p["span"] - 1) * gap
         y1 = y0 + stat_h
+        boxes_by_index[i] = (x0, y0, x1, y1)
 
+    def place(i, box):
+        boxes_by_index[i] = box
+
+    img = Image.new("RGB", (int(width), int(grid_h + header + 46)), bg)
+    d = ImageDraw.Draw(img)
+    tw = d.textlength(text, font=f_st)
+
+    # the badge is an inline pill inside its grid area, not a full-width cell
+    for i, ch in enumerate(children):
+        if "hm-streak" not in ch["cls"]:
+            continue
+        x0, y0, x1, y1 = boxes_by_index[i]
+        bw = tw + st_pad_h * 2 + 14 + 6
+        bx = x0 + margin_h
+        by = y0 + (stat_h - streak_h) / 2
+        place(i, (bx, by, bx + bw, by + streak_h))
+
+    # ---- overlap audit, computed not eyeballed
+    boxes = [(i, boxes_by_index[i]) for i in sorted(boxes_by_index)]
+    collisions = []
+    for a in range(len(boxes)):
+        for b in range(a + 1, len(boxes)):
+            ax0, ay0, ax1, ay1 = boxes[a][1]
+            bx0, by0, bx1, by1 = boxes[b][1]
+            if ax0 < bx1 and bx0 < ax1 and ay0 < by1 and by0 < ay1:
+                collisions.append((children[boxes[a][0]]["cls"],
+                                   children[boxes[b][0]]["cls"]))
+    stats_boxes = [boxes_by_index[i] for i, ch in enumerate(children)
+                   if "hm-stat" in ch["cls"]]
+    streak_box = next(boxes_by_index[i] for i, ch in enumerate(children)
+                      if "hm-streak" in ch["cls"])
+    streak_below = all(streak_box[1] >= sb[3] - 0.5 for sb in stats_boxes)
+
+    # ---- paint
+    label = f"{width}px  ·  {theme}  ·  {cols} columns"
+    d.text((pad, 20), label, font=load_font(19), fill=ink)
+    """The caption is derived from the measured placement, never asserted.
+    An earlier version printed "2x2 + badge below" unconditionally at 390px,
+    so the bug screenshot carried the healthy caption."""
+    if not streak_below:
+        note, note_warn = f"{rows} rows  ·  badge is NOT below the stats", True
+    elif cols == 2 and rows == 3:
+        note, note_warn = "2x2 + badge below", False
+    else:
+        note, note_warn = f"{rows} rows  ·  all stats above the badge", False
+    d.text((pad, 45), note, font=load_font(14), fill=urgent if note_warn else soft)
+
+    for i, ch in enumerate(children):
+        x0, y0, x1, y1 = boxes_by_index[i]
         if "hm-streak" in ch["cls"]:
-            # the badge is an inline pill inside its grid area, not a full cell
-            text = "7 يوم متصل"
-            tw = d.textlength(text, font=f_st)
-            bw = tw + st_pad_h * 2 + 14 + 6
-            bx = x0 + margin_h if cols == 2 else x0 + margin_h
-            by = y0 + (stat_h - streak_h) / 2
-            d.rounded_rectangle([bx, by, bx + bw, by + streak_h], radius=streak_h / 2,
+            d.rounded_rectangle([x0, y0, x1, y1], radius=(y1 - y0) / 2,
                                 fill=urgent_soft, outline=urgent, width=1)
-            d.text((bx + st_pad_h + 12, by + st_pad_v), text, font=f_st, fill=urgent)
-            placed[i]["box"] = (bx, by, bx + bw, by + streak_h)
+            d.text((x0 + st_pad_h + 12, y0 + st_pad_v), text, font=f_st, fill=urgent)
             continue
 
         d.rectangle([x0, y0, x1, y1], fill=card)
@@ -392,26 +433,10 @@ def render(width, theme="light", out="preview.png"):
         d.text((cx, y0 + stat_pad_v + line_h(f_num) + 2 + line_h(f_key)),
                ["41 صح من 55", "من 709", "متوسط 72%", "من 132"][i % 4],
                font=f_sub, fill=soft)
-        placed[i]["box"] = (x0, y0, x1, y1)
 
     # grid separators, drawn from the real 1px gap/border
-    d.rectangle([pad, top, pad + content, top + grid_h + border * 2], outline=line, width=1)
-
-    # ---- overlap audit, computed not eyeballed
-    boxes = [(i, placed[i]["box"]) for i in placed]
-    collisions = []
-    for a in range(len(boxes)):
-        for b in range(a + 1, len(boxes)):
-            ax0, ay0, ax1, ay1 = boxes[a][1]
-            bx0, by0, bx1, by1 = boxes[b][1]
-            if ax0 < bx1 and bx0 < ax1 and ay0 < by1 and by0 < ay1:
-                collisions.append((children[boxes[a][0]]["cls"],
-                                   children[boxes[b][0]]["cls"]))
-    stats_boxes = [placed[i]["box"] for i, ch in enumerate(children)
-                   if "hm-stat" in ch["cls"]]
-    streak_box = next(placed[i]["box"] for i, ch in enumerate(children)
-                      if "hm-streak" in ch["cls"])
-    streak_below = all(streak_box[1] >= sb[3] - 0.5 for sb in stats_boxes)
+    d.rectangle([pad, header, pad + content, header + grid_h + border * 2],
+                outline=line, width=1)
 
     img.save(f"{ROOT}/docs/screenshots/{out}")
     return {
