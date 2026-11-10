@@ -224,7 +224,7 @@ button{font-family:inherit;touch-action:manipulation}
 
 /* ---------- 3. progress ---------- */
 .hm-progress{
-  position:relative;display:grid;
+  display:grid;
   grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
   gap:1px;background:var(--line);border:1px solid var(--line);
   border-radius:var(--radius);overflow:hidden;margin-bottom:clamp(18px,3vw,26px)
@@ -239,9 +239,14 @@ button{font-family:inherit;touch-action:manipulation}
 }
 .hm-stat-k{font-size:12.5px;font-weight:800;color:var(--ink)}
 .hm-stat-sub{font-size:11.5px;font-weight:600;color:var(--ink-soft);line-height:1.5}
+/* A real grid row, not an overlay: it spans the full width and sits below the
+   four statistics, so it can never land on top of a number -- neither in RTL
+   nor at any width. */
 .hm-streak{
-  position:absolute;inset-inline-end:clamp(14px,2vw,20px);top:clamp(12px,2vw,16px);
+  grid-column:1/-1;grid-row:2;
   display:inline-flex;align-items:center;gap:5px;
+  justify-self:start;align-self:center;
+  margin:clamp(10px,1.6vw,14px) clamp(14px,2vw,20px);
   font-size:11.5px;font-weight:800;color:var(--urgent);
   background:var(--urgent-soft);border:1px solid currentColor;
   border-radius:99px;padding:3px 10px 3px 8px
@@ -313,7 +318,6 @@ button{font-family:inherit;touch-action:manipulation}
   /* Progress becomes a 2x2 grid so the numbers stay legible rather than
      shrinking into four skinny columns. */
   .hm-progress{grid-template-columns:1fr 1fr}
-  .hm-streak{position:static;grid-column:1/-1;justify-self:start;margin:12px 14px}
   .hm-stat-n{font-size:22px}
 
   .hm-review{padding:14px}

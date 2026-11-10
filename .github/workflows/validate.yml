@@ -323,6 +323,18 @@ jobs:
           fi
           echo "OK - the suite caught the contrast regression."
 
+      - name: Mutation check - a Space key that scrolls must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/course_card_space_key.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-space.log 2>&1; then
+            echo "::error::The suite passed while Space still scrolled the page."
+            cat /tmp/mutant-space.log
+            exit 1
+          fi
+          echo "OK - the suite caught the un-cancelled Space key."
+
       - name: Mutation check - a dead timer must fail the suite
         working-directory: question-bank-site
         run: |

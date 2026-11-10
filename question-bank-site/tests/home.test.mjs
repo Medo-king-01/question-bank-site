@@ -186,7 +186,7 @@ group('HOME · course list', () => {
     eq(ids, ev(window, 'DATA.map(c=>c.id)'), 'course order or count changed');
   });
 
-  it('makes each card keyboard reachable and operable', () => {
+  it('opens a course with Enter', () => {
     const { document, window } = boot();
     const card = document.querySelector('[data-course="ins"]');
     eq(card.getAttribute('role'), 'button', 'card needs a button role');
@@ -195,6 +195,54 @@ group('HOME · course list', () => {
     card.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     eq(ev(window, 'state.view'), 'course', 'Enter did not open the course');
     eq(ev(window, 'state.course.id'), 'ins', 'wrong course opened');
+  });
+
+  it('opens a course with Space and swallows the default scroll', () => {
+    /* Space is the other half of the button contract, and it is the one that
+       bites: a card that answers Space without preventDefault() also scrolls
+       the page underneath the student. Cancelable is true here because that is
+       how a browser dispatches keydown -- with cancelable:false, preventDefault
+       would be a silent no-op and the test would prove nothing. */
+    const { document, window } = boot();
+    const card = document.querySelector('[data-course="gov"]');
+    const press = new window.KeyboardEvent('keydown', {
+      key: ' ', bubbles: true, cancelable: true,
+    });
+    card.dispatchEvent(press);
+
+    eq(press.defaultPrevented, true, 'Space was not cancelled, so the page would scroll');
+    eq(ev(window, 'state.view'), 'course', 'Space did not open the course');
+    eq(ev(window, 'state.course.id'), 'gov', 'Space opened the wrong course');
+  });
+
+  it('cancels Space on the very event the handler navigates from', () => {
+    /* preventDefault() must be recorded on the same event object the handler
+       acted on, before navigation. A listener attached afterwards would only
+       observe the end state, so assert the flag on the dispatched event and
+       confirm the navigation happened as a result of it. */
+    const { document, window } = boot();
+    const card = document.querySelector('[data-course="db"]');
+    const press = new window.KeyboardEvent('keydown', {
+      key: ' ', bubbles: true, cancelable: true,
+    });
+    eq(press.defaultPrevented, false, 'precondition: nothing cancelled it yet');
+
+    card.dispatchEvent(press);
+
+    eq(press.defaultPrevented, true, 'the handler must call preventDefault for Space');
+    eq(ev(window, 'state.view'), 'course', 'Space did not open the course');
+    eq(ev(window, 'state.course.id'), 'db', 'Space opened the wrong course');
+  });
+
+  it('leaves other keys alone', () => {
+    const { document, window } = boot();
+    const card = document.querySelector('[data-course="ins"]');
+    for (const key of ['a', 'Tab', 'Escape', 'ArrowDown']) {
+      const press = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      card.dispatchEvent(press);
+      eq(press.defaultPrevented, false, `${key} must not be cancelled by the card`);
+    }
+    eq(ev(window, 'state.view'), 'home', 'an unrelated key navigated away');
   });
 
   it('keeps the best score badge and the not-started state distinct', () => {
