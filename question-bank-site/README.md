@@ -17,10 +17,10 @@
   <img src="docs/screenshots/06-result-mobile.jpg" alt="النتيجة" width="240">
 </p>
 
-![HTML5](https://img.shields.io/badge/HTML-single--file-4f46e5?style=flat-square)
-![No dependencies](https://img.shields.io/badge/dependencies-0-12a26b?style=flat-square)
-![Questions](https://img.shields.io/badge/questions-709-8b5cf6?style=flat-square)
-![Mobile ready](https://img.shields.io/badge/mobile-ready-25d366?style=flat-square)
+![HTML5](https://img.shields.io/badge/HTML-single--file-7c2a27?style=flat-square)
+![No dependencies](https://img.shields.io/badge/dependencies-0-2f6f4f?style=flat-square)
+![Questions](https://img.shields.io/badge/questions-709-e52729?style=flat-square)
+![Mobile ready](https://img.shields.io/badge/mobile-ready-a29594?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
 ---
@@ -133,7 +133,7 @@ python3 -m http.server 8000
 ├── package.json                # أدوات الاختبار فقط (jsdom) — الموقع نفسه بلا اعتماديات
 ├── .github/workflows/
 │   ├── pages.yml               # نشر تلقائي على GitHub Pages
-│   └── validate.yml            # فحص البيانات + البناء + 158 اختبارًا + فحص طفرات
+│   └── validate.yml            # فحص البيانات + البناء + 186 اختبارًا + فحص طفرات
 └── LICENSE                     # MIT
 ```
 
@@ -146,8 +146,8 @@ python3 scripts/build_site.py            # يكتب index.html (≈571 KB) + man
 python3 scripts/extract/audit.py         # فحص البيانات: لازم ينتهي بـ OK
 python3 scripts/extract/audit.py --strict # نفس الفحص + التحذيرات كأخطاء
 
-npm install --no-save jsdom              # مرة واحدة (أداة اختبار فقط)
-node tests/run.mjs                       # 173 اختبارًا سلوكيًا — لازم PASS
+npm install --no-save jsdom@31.0.0       # مرة واحدة (أداة اختبار فقط)
+node tests/run.mjs                       # 186 اختبارًا سلوكيًا — لازم PASS
 ```
 
 > **متطلب الاختبارات:** Node **22.22.2 أو أحدث** — `jsdom 31` يعتمد على واجهة `zstd` المضافة في Node 22.7. الموقع نفسه لا يحتاج Node إطلاقًا؛ القيد على أداة الاختبار فقط، والمشغّل يعطي رسالة واضحة لو الإصدار أقدم.
@@ -206,7 +206,7 @@ node tests/run.mjs                       # 173 اختبارًا سلوكيًا �
     "id": "ethics",
     "title": "أخلاقيات الأعمال والحوكمة",
     "emoji": "⚖️",
-    "color": "#7c3aed",
+    "color": "#7c2a27",
     "sections": [
       {
         "id": "eth-mcq-1",

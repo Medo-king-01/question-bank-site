@@ -3,7 +3,7 @@
   "id": "ethics",
   "title": "أخلاقيات الأعمال والحوكمة",
   "emoji": "⚖️",
-  "color": "#7c3aed",
+  "color": "#7c2a27",
   "sections": [
    {
     "id": "mcq",
@@ -690,7 +690,7 @@
   "id": "invest",
   "title": "مبادئ الاستثمار",
   "emoji": "📈",
-  "color": "#0ea5e9",
+  "color": "#a3312e",
   "sections": [
    {
     "id": "mcq",
@@ -1474,7 +1474,7 @@
   "id": "acct",
   "title": "محاسبة متوسطة (1)",
   "emoji": "🧾",
-  "color": "#16a34a",
+  "color": "#8a5a12",
   "sections": [
    {
     "id": "mcq",
@@ -1868,7 +1868,7 @@
   "id": "prog",
   "title": "تصميم برامج الحاسب الآلي",
   "emoji": "💻",
-  "color": "#f59e0b",
+  "color": "#e97371",
   "sections": [
    {
     "id": "mcq",
@@ -3217,7 +3217,7 @@
   "id": "macro",
   "title": "الاقتصاد الكلي",
   "emoji": "📊",
-  "color": "#ef4444",
+  "color": "#e52729",
   "sections": [
    {
     "id": "mcq",
@@ -3838,7 +3838,7 @@
   "id": "gov",
   "title": "اقتصاديات الخدمات الحكومية",
   "emoji": "🏛️",
-  "color": "#0d9488",
+  "color": "#5f1f1d",
   "sections": [
    {
     "id": "mcq",
@@ -4290,7 +4290,7 @@
   "id": "ins",
   "title": "التأمين وإدارة الخطر",
   "emoji": "🛡️",
-  "color": "#0284c7",
+  "color": "#a29594",
   "sections": [
    {
     "id": "mcq-0",
@@ -5468,7 +5468,7 @@
   "id": "db",
   "title": "قواعد البيانات",
   "emoji": "🗄️",
-  "color": "#4338ca",
+  "color": "#2f6f4f",
   "sections": [
    {
     "id": "mcq-0",

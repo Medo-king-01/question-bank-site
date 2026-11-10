@@ -773,12 +773,29 @@ group('PWA·connection', () => {
      * resolves the dark palette. Catches the whole class of "white on a colour
      * that turned pale in dark mode" bugs. */
     const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
-    const dark = {
-      '--bg': '#0b1020', '--bg2': '#0f1730', '--card': '#141c33',
-      '--ink': '#eef2ff', '--ink-soft': '#9aa6c4', '--accent': '#7c8cff',
-      '--accent-soft': '#1c2445', '--ok': '#3ddc97', '--ok-soft': '#10281f',
-      '--bad': '#ff6b6b', '--bad-soft': '#2a1518',
+    /* Read the palette straight out of the shipped [data-theme="dark"] block
+     * instead of keeping a hand-copied duplicate that silently goes stale —
+     * the previous copy still described the retired indigo theme. */
+    const cssAll = html.slice(html.indexOf('<style>'), html.indexOf('</style>')).replace(/\/\*[\s\S]*?\*\//g, '');
+    const rootBlock = (() => {
+      const i = cssAll.indexOf(':root{');
+      return cssAll.slice(i, cssAll.indexOf('}', i));
+    })();
+    const darkBlock = (() => {
+      const i = cssAll.indexOf('[data-theme="dark"]{');
+      return cssAll.slice(i, cssAll.indexOf('}', i));
+    })();
+    const readDecl = (block, name) => {
+      const i = block.indexOf(name + ':');
+      return i < 0 ? null : block.slice(i + name.length + 1, block.indexOf(';', i)).trim();
     };
+    const dark = {};
+    for (const m of darkBlock.matchAll(/(--[\w-]+)\s*:/g)) dark[m[1]] = readDecl(darkBlock, m[1]);
+    /* Palette references such as var(--color-4) resolve through :root. */
+    for (const [k, v] of Object.entries(dark)) {
+      const ref = v && v.match(/^var\((--[\w-]+)\)$/);
+      if (ref) dark[k] = readDecl(rootBlock, ref[1]) ?? v;
+    }
     const resolve = (v) => {
       for (let i = 0; i < 3; i++) {
         const m = v.trim().match(/^var\((--[\w-]+)\)$/);

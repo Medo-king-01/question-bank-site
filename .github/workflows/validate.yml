@@ -87,7 +87,13 @@ jobs:
 
       - name: Install test tooling (jsdom only; the site itself has no deps)
         working-directory: question-bank-site
-        run: npm install --no-save --no-audit --no-fund jsdom
+        run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
+
+      - name: Install screenshot tooling (Pillow; only paints the evidence PNGs)
+        # tests/render.test.mjs runs scripts/render_home_layout.py, which needs
+        # Pillow to write docs/screenshots. Without it the render tests would
+        # fail for an environment reason rather than a layout reason.
+        run: python3 -m pip install --disable-pip-version-check --quiet pillow
 
       - name: Run behavioural tests
         working-directory: question-bank-site
@@ -106,7 +112,11 @@ jobs:
           node-version: "22"
       - name: Install test tooling
         working-directory: question-bank-site
-        run: npm install --no-save --no-audit --no-fund jsdom
+        run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
+      - name: Install screenshot tooling (Pillow)
+        # Must be present here too: a mutation is only "caught" if the suite
+        # fails because of the mutated code, not because a tool was missing.
+        run: python3 -m pip install --disable-pip-version-check --quiet pillow
       - name: Mutation check - a broken esc() must fail the suite
         working-directory: question-bank-site
         run: |
@@ -227,7 +237,7 @@ jobs:
           from pathlib import Path
           p = Path("src/app_template.html")
           s = p.read_text(encoding="utf-8")
-          needle = "    if ((rec.due || 0) > now) continue;\n    if (!ITEMS[rec.id]) continue;                  // question left the bank"
+          needle = "    if ((rec.due || 0) > now) continue;\n    /* The map key is the id; rec.id is only a mirror"
           assert needle in s, "dueCount changed - update this mutation"
           p.write_text(s.replace(needle, "    if (rec.level >= MASTERY_STABLE) continue;\n" + needle, 1), encoding="utf-8")
           PY
@@ -310,6 +320,42 @@ jobs:
             exit 1
           fi
           echo "OK - the suite caught the scope leak."
+
+      - name: Mutation check - an unreadable dark-mode answer chip must fail
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/dark_chip_contrast.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-colour.log 2>&1; then
+            echo "::error::The suite passed with an unreadable answer chip."
+            cat /tmp/mutant-colour.log
+            exit 1
+          fi
+          echo "OK - the suite caught the contrast regression."
+
+      - name: Mutation check - a Space key that scrolls must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/course_card_space_key.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-space.log 2>&1; then
+            echo "::error::The suite passed while Space still scrolled the page."
+            cat /tmp/mutant-space.log
+            exit 1
+          fi
+          echo "OK - the suite caught the un-cancelled Space key."
+
+      - name: Mutation check - a pinned streak row must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/streak_pinned_row.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-streak.log 2>&1; then
+            echo "::error::The suite passed with the streak pinned to row 2."
+            cat /tmp/mutant-streak.log
+            exit 1
+          fi
+          echo "OK - the suite caught the broken 2x2 progress block."
 
       - name: Mutation check - a dead timer must fail the suite
         working-directory: question-bank-site

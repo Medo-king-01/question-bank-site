@@ -33,6 +33,9 @@ await import('./a11y.test.mjs');
 await import('./history.test.mjs');
 await import('./search.test.mjs');
 await import('./pwa.test.mjs');
+await import('./colors.test.mjs');
+await import('./home.test.mjs');
+await import('./render.test.mjs');
 
 const { run } = await import('./harness.mjs');
 const ok = await run();
