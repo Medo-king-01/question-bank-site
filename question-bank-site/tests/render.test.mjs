@@ -87,6 +87,35 @@ group('RENDER · home progress block', () => {
     }
   });
 
+  it('reads gap, border and grid-column instead of assuming them', () => {
+    /* The engine is not a browser: it models a slice of CSS. This check is the
+       contract for that slice -- the arithmetic must respond to each property,
+       so a stylesheet change cannot slip past the picture. */
+    const out = execFileSync('python3',
+      ['scripts/render_home_layout.py', '--self-check'],
+      { cwd: ROOT, encoding: 'utf8', timeout: 120000 });
+    const parsed = JSON.parse(out);
+    eq(parsed.ok, true, `engine self-check failed: ${JSON.stringify(parsed.problems)}`);
+  });
+
+  it('reports every declaration it had to assume', () => {
+    /* An empty list means every value the engine needs came from the real
+       stylesheet. A non-empty one is the honest admission that the picture is
+       partly drawn from a default, and it should not go unnoticed. */
+    for (const row of renderReport()) {
+      eq(row.assumptions, [],
+        `${row.width}px ${row.theme}: engine assumed ${JSON.stringify(row.assumptions)}`);
+    }
+  });
+
+  it('takes the streak span from the declared grid-column', () => {
+    for (const row of renderReport()) {
+      const expected = row.streak_grid_column === '1/-1' ? row.columns : row.streak_span;
+      eq(row.streak_span, expected,
+        `${row.width}px: span ${row.streak_span} does not match ${row.streak_grid_column}`);
+    }
+  });
+
   it('writes the screenshots it claims to write', () => {
     for (const row of renderReport()) {
       const path = join(ROOT, row.image);

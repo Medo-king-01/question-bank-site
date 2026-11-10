@@ -11,6 +11,25 @@ while the streak badge sits below them, with nothing overlapping?
 
 Only the .hm-progress subtree is modelled -- enough to check placement,
 spacing and overlap, not to reproduce the whole page.
+
+WHAT IS MODELLED, AND WHAT IS NOT
+---------------------------------
+Read from the real stylesheet: grid-template-columns (repeat/auto-fit/minmax and
+plain fr lists), gap, border width, the container's padding and max-width
+(.wrap), each cell's padding shorthand, font-size incl. clamp()/vw, and the
+streak's grid-column (for its span) and grid-row (for pinning).
+
+Modelled by the algorithm rather than read as a declaration: auto-placement
+order, auto-fit track collapse, and grid-column:1/-1 -> the full track count.
+
+NOT modelled, and deliberately out of scope: explicit line names, grid-template
+-areas, order/dense packing, subgrid, min-content/max-content sizing, vertical
+writing modes, and any page geometry outside .hm-progress. Text is measured with
+a Pillow font, so line boxes are approximated rather than shaped.
+
+When a property the engine needs is absent it does not invent a number
+silently: it appends to `assumptions` in the JSON and the render tests fail.
+That keeps the gap between "the CSS says" and "the picture shows" visible.
 """
 import json
 import os
@@ -185,6 +204,136 @@ def style_for(rules, classes):
     return got
 
 
+def decl(rules, classes, prop, default, assumptions, label=None):
+    """Read one property from the cascaded rules, recording any fallback.
+
+    The engine deliberately models a subset of CSS. When a property it needs
+    is missing from the stylesheet it must not quietly substitute a number:
+    that would make the picture disagree with the browser and nobody would
+    see why. Every fallback is appended to `assumptions`, and the render
+    tests fail when that list is non-empty for geometry.
+    """
+    style = style_for(rules, classes)
+    if prop in style and style[prop].strip():
+        return style[prop].strip()
+    assumptions.append(f"{label or classes}.{prop} missing -> assumed {default!r}")
+    return default
+
+
+def px_or(v, default=0.0):
+    return px(v, default)
+
+
+def first_px(v, default=0.0):
+    """Width from the first <length> in a shorthand ('1px solid', '14px 20px')."""
+    m = re.search(r"(-?[\d.]+)px", str(v))
+    return float(m.group(1)) if m else default
+
+
+def span_of(grid_column, cols):
+    """(start_index, span) for a `grid-column` value, or (None, span) if auto.
+
+    Line numbers are 1-based in CSS; -1 means the last line. Returning the
+    start lets the caller honour `grid-column:2/4` instead of quietly
+    pretending every spanned item begins at the first column.
+    """
+    v = (grid_column or "auto").replace(" ", "")
+    if v in ("auto", ""):
+        return None, 1
+    m = re.fullmatch(r"(\d+)/(\d+|-(\d+))", v)
+    if m:
+        start = int(m.group(1))
+        end_raw = m.group(2)
+        end = cols + 1 if end_raw == "-1" else int(end_raw.lstrip("-"))
+        span = max(1, end - start)
+        return start - 1, span
+    m = re.fullmatch(r"span(\d+)", v)
+    return None, (int(m.group(1)) if m else 1)
+
+
+def track_metrics(content, cols, gap, border):
+    """Column width from the container box, the track count, the gap and border.
+
+    Isolated so the self-check can prove the three inputs are live: a change
+    in any of them must move this number.
+    """
+    inner = content - border * 2
+    return inner, (inner - gap * (cols - 1)) / cols
+
+
+def self_check():
+    """Cheap proof that the engine reads its inputs instead of assuming them.
+
+    Runs without rebuilding the site: every case is a pure function call or a
+    one-line change to a stylesheet string.
+    """
+    problems = []
+
+    def expect(name, got, want):
+        if got != want:
+            problems.append({"check": name, "got": got, "want": want})
+
+    # grid-column -> (start line index, span)
+    expect("span_of(1/-1, 4)", span_of("1/-1", 4), (0, 4))
+    expect("span_of(1/-1, 2)", span_of("1/-1", 2), (0, 2))
+    expect("span_of(2/4, 4)", span_of("2/4", 4), (1, 2))
+    expect("span_of(1/2, 2)", span_of("1/2", 2), (0, 1))
+    expect("span_of(span 1, 2)", span_of("span 1", 2), (None, 1))
+    expect("span_of(auto, 3)", span_of("auto", 3), (None, 1))
+
+    # gap and border must move the column width
+    base = track_metrics(360, 2, 1, 1)[1]
+    expect("gap 1->9 narrows a column", round(base - track_metrics(360, 2, 9, 1)[1], 4), 4.0)
+    expect("border 1->5 narrows a column", round(base - track_metrics(360, 2, 1, 5)[1], 4), 4.0)
+    expect("gap 1->9 widens the gutter", round((360 - 1 * 2) - (base * 2 + 1 * 1), 4), 0.0)
+
+    # a missing declaration must be reported, never silently invented
+    notes = []
+    got = decl([(".hm-x", {"padding": "3px"})], "hm-x", "gap", "1px", notes)
+    expect("missing gap falls back", got, "1px")
+    expect("missing gap is reported", len(notes), 1)
+
+    # a present declaration must not be reported at all
+    notes2 = []
+    got2 = decl([(".hm-x", {"gap": "7px"})], "hm-x", "gap", "1px", notes2)
+    expect("present gap is read", got2, "7px")
+    expect("present gap raises nothing", len(notes2), 0)
+
+    return problems
+
+
+def cascade_sides(rules, classes, default, assumptions):
+    """padding shorthand -> (top, right, bottom, left) in px, all four sides."""
+    style = style_for(rules, classes)
+    raw = style.get("padding", "")
+    if not raw.strip():
+        assumptions.append(f"{classes}.padding missing -> assumed {default}")
+        return default
+    v = [clamp_fn(x) for x in raw.split()]
+    if len(v) == 1:
+        t = r = b = l = v[0]
+    elif len(v) == 2:
+        t = b = v[0]; r = l = v[1]
+    elif len(v) == 3:
+        t, r, b = v; l = v[1]
+    else:
+        t, r, b, l = v[:4]
+    return t, r, b, l
+
+
+def cascade_padding(rules, classes, default_pad):
+    """Padding shorthand -> (vertical, horizontal) in px."""
+    style = style_for(rules, classes)
+    raw = style.get("padding", "")
+    parts = raw.split()
+    if not parts:
+        return default_pad, default_pad
+    vals = [clamp_fn(x) for x in parts]
+    if len(vals) == 1:
+        return vals[0], vals[0]
+    return vals[0], vals[1]
+
+
 def px(v, default=0.0):
     if v is None:
         return default
@@ -261,9 +410,15 @@ def render(width, theme="light", out="preview.png"):
     dom = read_home_dom()
     rules = relevant_rules(css, width)
 
-    # page box: .wrap max-width 1080, padding 18/14/11 by breakpoint
-    pad = 11 if width <= 380 else 14 if width <= 620 else 18
-    content = min(width, 1080) - pad * 2
+    assumptions = []
+
+    # ---- page box, read from .wrap rather than assumed from the breakpoints
+    wrap = style_for(rules, "wrap")
+    max_w = first_px(wrap.get("max-width", ""), float(width))
+    page_pad_h = cascade_padding(rules, "wrap", 0.0)[1]
+    content = min(width, max_w) - page_pad_h * 2
+    # where the content box starts inside the image (centred when max-width bites)
+    margin = (width - min(width, max_w)) / 2 + page_pad_h
 
     prog = style_for(rules, "hm-progress")
     cols_decl = prog.get("grid-template-columns", "")
@@ -279,10 +434,11 @@ def render(width, theme="light", out="preview.png"):
     else:
         cols = len(re.findall(r"\d+fr", cols_decl)) or 1
 
-    gap = 1.0
-    border = 1.0
-    inner_w = content - border * 2
-    col_w = (inner_w - gap * (cols - 1)) / cols
+    gap = clamp_fn(prog.get("gap", "0px")) if "gap" in prog else \
+        decl(rules, "hm-progress", "gap", "1px", assumptions)
+    border = first_px(prog.get("border", ""), 0.0) if "border" in prog else \
+        decl(rules, "hm-progress", "border", "1px solid", assumptions)
+    inner_w, col_w = track_metrics(content, cols, gap, border)
 
     stat = style_for(rules, "hm-stat")
     stat_pad_v = clamp_fn(stat.get("padding", "18px 20px").split()[0])
@@ -299,10 +455,14 @@ def render(width, theme="light", out="preview.png"):
     stat_h = stat_pad_v * 2 + line_h(f_num) + 2 + line_h(f_key) + line_h(f_sub)
 
     streak = style_for(rules, "hm-streak")
-    st_pad_v = 3.0
-    st_pad_h = 8.0
+    # padding:3px 10px 3px 8px -- all four sides matter for the pill's box
+    st_top, st_right, st_bottom, st_left = cascade_sides(
+        rules, "hm-streak", (3.0, 10.0, 3.0, 8.0), assumptions)
+    st_border = first_px(streak.get("border", ""),
+                         first_px(decl(rules, "hm-streak", "border", "1px solid",
+                                       assumptions), 0.0))
     f_st = load_font(max(9, int(clamp_fn(streak.get("font-size", "11.5px")))))
-    streak_h = st_pad_v * 2 + f_st.size + 4
+    streak_h = st_top + st_bottom + st_border * 2 + f_st.size + 4
     margin_v = clamp_fn(streak.get("margin", "14px 20px").split()[0])
     margin_h = clamp_fn(streak.get("margin", "14px 20px").split()[-1])
 
@@ -314,17 +474,43 @@ def render(width, theme="light", out="preview.png"):
         pinned = int(m.group(1)) if m else None
 
     occupied, placed = set(), {}
+    # The streak's width comes from its own grid-column (1/-1 today), not from
+    # an assumption that it is always full width. If that rule changes, the
+    # engine follows it instead of hiding the change.
+    streak_sel = next((ch["cls"] for ch in children if "hm-streak" in ch["cls"]), None)
+    if streak_sel:
+        gcol = decl(rules, "hm-streak", "grid-column", "1/-1", assumptions)
+        streak_start, streak_span = span_of(gcol, cols)
+    else:
+        gcol, streak_start, streak_span = "auto", None, 1
+
     for i, ch in enumerate(children):
         if "hm-streak" in ch["cls"] and pinned is not None:
-            for c in range(cols):
+            col0 = streak_start if streak_start is not None else 0
+            col0 = min(col0, max(0, cols - 1))
+            for c in range(col0, min(cols, col0 + streak_span)):
                 occupied.add((pinned - 1, c))
-            placed[i] = {"row": pinned - 1, "col": 0, "span": cols}
+            placed[i] = {"row": pinned - 1, "col": col0, "span": streak_span}
 
     r, c = 0, 0
     for i, ch in enumerate(children):
         if i in placed:
             continue
-        span = cols if "hm-streak" in ch["cls"] else 1
+        if "hm-streak" in ch["cls"]:
+            span = streak_span
+            if streak_start is not None:
+                # explicit line: jump straight there, then wrap if occupied
+                r = max(r, 0)
+                c = streak_start
+                if any((r, c + k) in occupied for k in range(span)):
+                    r += 1
+                    c = streak_start
+                for k in range(span):
+                    occupied.add((r, c + k))
+                placed[i] = {"row": r, "col": c, "span": span}
+                c += span
+                continue
+        span = 1
         while True:
             if c + span > cols:
                 r += 1
@@ -362,7 +548,7 @@ def render(width, theme="light", out="preview.png"):
     boxes_by_index = {}
     for i, ch in enumerate(children):
         p = placed[i]
-        x0 = pad + border + p["col"] * (col_w + gap)
+        x0 = margin + border + p["col"] * (col_w + gap)
         y0 = header + border + p["row"] * (stat_h + gap)
         x1 = x0 + p["span"] * col_w + (p["span"] - 1) * gap
         y1 = y0 + stat_h
@@ -380,7 +566,8 @@ def render(width, theme="light", out="preview.png"):
         if "hm-streak" not in ch["cls"]:
             continue
         x0, y0, x1, y1 = boxes_by_index[i]
-        bw = tw + st_pad_h * 2 + 14 + 6
+        # 14px icon + 6px inline gap, then the four real paddings and borders
+        bw = tw + st_left + st_right + st_border * 2 + 14 + 6
         bx = x0 + margin_h
         by = y0 + (stat_h - streak_h) / 2
         place(i, (bx, by, bx + bw, by + streak_h))
@@ -403,7 +590,7 @@ def render(width, theme="light", out="preview.png"):
 
     # ---- paint
     label = f"{width}px  ·  {theme}  ·  {cols} columns"
-    d.text((pad, 20), label, font=load_font(19), fill=ink)
+    d.text((margin, 20), label, font=load_font(19), fill=ink)
     """The caption is derived from the measured placement, never asserted.
     An earlier version printed "2x2 + badge below" unconditionally at 390px,
     so the bug screenshot carried the healthy caption."""
@@ -413,14 +600,15 @@ def render(width, theme="light", out="preview.png"):
         note, note_warn = "2x2 + badge below", False
     else:
         note, note_warn = f"{rows} rows  ·  all stats above the badge", False
-    d.text((pad, 45), note, font=load_font(14), fill=urgent if note_warn else soft)
+    d.text((margin, 45), note, font=load_font(14), fill=urgent if note_warn else soft)
 
     for i, ch in enumerate(children):
         x0, y0, x1, y1 = boxes_by_index[i]
         if "hm-streak" in ch["cls"]:
             d.rounded_rectangle([x0, y0, x1, y1], radius=(y1 - y0) / 2,
                                 fill=urgent_soft, outline=urgent, width=1)
-            d.text((x0 + st_pad_h + 12, y0 + st_pad_v), text, font=f_st, fill=urgent)
+            d.text((x0 + st_left + st_border + 14 + 6, y0 + st_top + st_border),
+                   text, font=f_st, fill=urgent)
             continue
 
         d.rectangle([x0, y0, x1, y1], fill=card)
@@ -435,7 +623,7 @@ def render(width, theme="light", out="preview.png"):
                font=f_sub, fill=soft)
 
     # grid separators, drawn from the real 1px gap/border
-    d.rectangle([pad, header, pad + content, header + grid_h + border * 2],
+    d.rectangle([margin, header, margin + content, header + grid_h + border * 2],
                 outline=line, width=1)
 
     img.save(f"{ROOT}/docs/screenshots/{out}")
@@ -445,6 +633,9 @@ def render(width, theme="light", out="preview.png"):
         "streak_below_all_stats": streak_below,
         "badge": [round(v) for v in streak_box],
         "stats": [[round(v) for v in b] for b in stats_boxes],
+        "streak_grid_column": gcol,
+        "streak_span": streak_span,
+        "assumptions": assumptions,
         "contrast_badge": round(contrast(urgent, urgent_soft), 2),
         "contrast_number": round(contrast(ink, card), 2),
         "image": f"docs/screenshots/{out}",
@@ -452,6 +643,10 @@ def render(width, theme="light", out="preview.png"):
 
 
 if __name__ == "__main__":
+    if "--self-check" in sys.argv:
+        problems = self_check()
+        print(json.dumps({"ok": not problems, "problems": problems}, indent=1))
+        sys.exit(1 if problems else 0)
     os.makedirs(f"{ROOT}/docs/screenshots", exist_ok=True)
     cases = [(1440, "light"), (768, "light"), (390, "light"),
              (768, "dark"), (390, "dark")]
