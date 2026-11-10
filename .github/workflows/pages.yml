@@ -28,7 +28,15 @@ jobs:
           mkdir -p _site
           cp question-bank-site/index.html _site/index.html
           cp -R question-bank-site/src _site/src
+          # PWA: the manifest and the service worker must be served from the
+          # site root (a worker only controls URLs under its own directory).
+          cp question-bank-site/manifest.json _site/manifest.json
+          cp question-bank-site/sw.js _site/sw.js
           touch _site/.nojekyll
+          # Fail loudly rather than shipping a PWA that 404s in the browser.
+          for f in index.html manifest.json sw.js src/pwa/icon-192.png src/pwa/icon-512.png; do
+            test -f "_site/$f" || { echo "missing PWA file: $f"; exit 1; }
+          done
           ls -la _site
       - uses: actions/upload-pages-artifact@v3
         with:

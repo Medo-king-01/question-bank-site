@@ -17,7 +17,12 @@
 <meta name="twitter:title" content="بنك الأسئلة التفاعلي — ميد تيرم">
 <meta name="twitter:description" content="8 مقررات و709 أسئلة تفاعلياً مع تصحيح فوري وشرح — صُنع بواسطة medo king">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M18 40l7-16h5l7 16h-5l-1.4-3.6h-6.2L23 40h-5zm7.7-7.4h4.6L28 26.7l-2.3 5.9z' fill='%23fff'/%3E%3Cpath d='M39 25.5l3.4 3.4 6-6.4' fill='none' stroke='%233ddc97' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%234f46e5'/%3E%3Ctext x='32' y='44' font-size='34' font-family='sans-serif' font-weight='bold' text-anchor='middle' fill='%23fff'%3EA%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="src/pwa/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="src/pwa/favicon-32.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="بنك الأسئلة">
 <style>
 :root{
   --bg:#f4f6fb; --bg2:#eaeefb; --card:#ffffff; --ink:#101828; --ink-soft:#5b6478;
@@ -87,6 +92,7 @@ button{font-family:inherit;touch-action:manipulation}
   display:flex;align-items:flex-end;justify-content:center;align-self:stretch;
   min-height:260px;overflow:visible
 }
+.hero-portrait picture{display:block;width:100%;height:100%}
 .hero-portrait img{
   display:block;width:100%;height:clamp(260px,31vw,360px);max-height:360px;
   object-fit:contain;object-position:center bottom
@@ -210,6 +216,20 @@ button{font-family:inherit;touch-action:manipulation}
 .lightbox .lb-x{position:absolute;top:calc(10px + env(safe-area-inset-top));inset-inline-end:14px;width:40px;height:40px;
   border-radius:50%;border:none;background:#fff;color:#111;font-size:20px;font-weight:800;cursor:pointer}
 .opts{display:flex;flex-direction:column;gap:9px}
+/* ---------- accessibility: visible focus + motion ---------- */
+:where(a,button,input,select,label).focus-visible{
+  outline:3px solid var(--accent);outline-offset:2px;border-radius:10px
+}
+.opt:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;scroll-behavior:auto !important}
+}
+
 .opt{
   display:grid;grid-template-columns:28px 1fr 20px;align-items:center;gap:11px;border:1.5px solid var(--line);background:var(--card);
   border-radius:13px;padding:12px 14px;cursor:pointer;text-align:right;font-size:15px;line-height:1.6;
@@ -268,6 +288,107 @@ button{font-family:inherit;touch-action:manipulation}
 .rstat{background:var(--bg2);border-radius:14px;padding:14px;text-align:center}
 .rstat b{display:block;font-size:22px}
 .rstat span{font-size:12.5px;color:var(--ink-soft);font-weight:700}
+.pwa-toast{
+  position:fixed;left:50%;bottom:18px;transform:translate(-50%,140%);z-index:90;
+  display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 28px));
+  background:var(--ink);color:#fff;border-radius:14px;padding:13px 16px;
+  box-shadow:0 12px 34px rgba(16,24,40,.28);transition:transform .28s ease;
+  font-size:13.5px;font-weight:700;line-height:1.5
+}
+.pwa-toast.show{transform:translate(-50%,0)}
+.pwa-msg{flex:1;min-width:0}
+.pwa-act{
+  border:0;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:13px;
+  padding:9px 15px;border-radius:10px;cursor:pointer;white-space:nowrap;flex-shrink:0
+}
+.pwa-act:hover{filter:brightness(1.1)}
+@media (prefers-reduced-motion: reduce){ .pwa-toast{transition:none} }
+.qsearch{position:relative;display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);
+  background:var(--card);border-radius:13px;padding:0 13px;transition:.15s}
+.qsearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.qsearch-ic{display:inline-flex;color:var(--ink-soft);flex-shrink:0}
+.qsearch input{flex:1;border:0;background:transparent;outline:none;font-family:inherit;font-size:14.5px;
+  color:var(--ink);padding:13px 0;min-width:0}
+.qsearch input::placeholder{color:var(--ink-soft);opacity:.75}
+.qsearch input::-webkit-search-cancel-button{display:none}
+.qsearch-x{border:0;background:var(--bg2);color:var(--ink-soft);width:26px;height:26px;border-radius:50%;
+  cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;flex-shrink:0;font-family:inherit}
+.qsearch-x:hover{background:var(--bad-soft);color:var(--bad)}
+
+.srch-head{font-size:13px;color:var(--ink-soft);margin:12px 0 10px;display:flex;align-items:center;
+  gap:7px;flex-wrap:wrap;font-weight:700}
+.srch-head b{color:var(--ink);font-size:13.5px}
+.srch-cap{opacity:.8}
+.srch-time{margin-inline-start:auto;font-size:11px;background:var(--bg2);padding:3px 8px;border-radius:99px;
+  font-weight:800;opacity:.85}
+.srch-list{display:flex;flex-direction:column;gap:9px}
+.srch-item{border:1px solid var(--line);border-radius:13px;padding:12px 14px;background:var(--card)}
+.srch-q{font-size:14px;font-weight:700;line-height:1.65;margin-bottom:7px}
+.srch-meta{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:7px}
+.srch-sec,.srch-type,.srch-note-flag{font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;
+  background:var(--bg2);color:var(--ink-soft)}
+.srch-note-flag{background:var(--accent-soft);color:var(--accent)}
+.srch-ans{font-size:13px;color:var(--ok);font-weight:700;line-height:1.6}
+.srch-ans b{color:var(--ink-soft);font-weight:800;font-size:11.5px}
+.srch-note{font-size:12.5px;color:var(--ink-soft);line-height:1.65;margin-top:6px;padding-top:6px;
+  border-top:1px dashed var(--line)}
+.srch-empty{border:1px dashed var(--line);border-radius:13px;padding:16px;text-align:center;margin-top:12px}
+.srch-empty b{display:block;font-size:14px;margin-bottom:5px}
+.srch-empty span{font-size:12.5px;color:var(--ink-soft);line-height:1.6}
+.lv-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.lv-head{font-size:12.5px;color:var(--ink-soft);font-weight:800;margin-bottom:10px}
+.lv-row{display:grid;grid-template-columns:70px 1fr 34px;align-items:center;gap:9px;margin-bottom:7px}
+.lv-lbl{font-size:11.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv-track{height:7px;border-radius:99px;background:var(--bg2);overflow:hidden}
+.lv-track i{display:block;height:100%;border-radius:99px;transition:width .3s;min-width:2px}
+.lv-n{font-size:11.5px;font-weight:800;color:var(--ink-soft);text-align:left}
+.an-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 22px}
+.an-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;text-align:center}
+.an-card b{display:block;font-size:26px;line-height:1.2;margin-bottom:4px}
+.an-card span{font-size:12.5px;color:var(--ink-soft);font-weight:700}
+.an-card.ok b{color:var(--ok)} .an-card.bad b{color:var(--bad)} .an-card.accent b{color:var(--accent)}
+.an-panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px}
+.an-panel h3{font-size:15.5px;margin:0 0 4px}
+.an-panel .hint{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px}
+.an-bar{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;margin-bottom:11px}
+.an-bar .lbl{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.an-bar .val{font-size:12.5px;font-weight:800;color:var(--ink-soft)}
+.an-bar .track{grid-column:1/-1;height:8px;border-radius:99px;background:var(--bg2);overflow:hidden}
+.an-bar .track i{display:block;height:100%;border-radius:99px;transition:width .3s}
+.an-days{display:flex;align-items:flex-end;gap:5px;height:96px;margin-top:6px}
+.an-day{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;min-width:0}
+.an-day .col{width:100%;border-radius:6px 6px 3px 3px;background:var(--accent-soft);min-height:3px;
+  display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+.an-day .col i{display:block;width:100%;background:var(--ok);border-radius:3px 3px 0 0}
+.an-day .d{font-size:10.5px;color:var(--ink-soft);font-weight:700;white-space:nowrap}
+.an-day .n{font-size:10.5px;color:var(--ink-soft);font-weight:800}
+.an-empty{text-align:center;color:var(--ink-soft);font-size:13.5px;padding:18px 8px;font-weight:600}
+.sess{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.sess:last-child{border-bottom:0}
+.sess .t{flex:1;min-width:0}
+.sess .t b{display:block;font-size:13.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess .t span{font-size:11.5px;color:var(--ink-soft);font-weight:600}
+.sess .p{font-weight:800;font-size:14px;white-space:nowrap}
+.hard-q{padding:11px 0;border-bottom:1px solid var(--line);font-size:13.5px;line-height:1.65}
+.hard-q:last-child{border-bottom:0}
+.hard-q .hq{font-weight:700;margin-bottom:5px}
+.hard-q .hm{font-size:11.5px;color:var(--ink-soft);font-weight:700;display:flex;gap:10px;flex-wrap:wrap}
+.wk{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.wk:last-child{border-bottom:0}
+.wk .n{width:26px;height:26px;border-radius:9px;background:var(--bad-soft);color:var(--bad);
+  display:grid;place-items:center;font-weight:800;font-size:12px;flex-shrink:0}
+.wk .t{flex:1;min-width:0}
+.wk .t b{display:block;font-size:13.5px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk .t span{font-size:11.5px;color:var(--ink-soft);font-weight:600}
+.wk .p{font-weight:800;white-space:nowrap}
+.tabs{display:flex;gap:8px;margin:0 0 18px;flex-wrap:wrap}
+.tabs button{border:1.5px solid var(--line);background:var(--card);border-radius:99px;padding:9px 16px;
+  font-size:13.5px;font-weight:800;cursor:pointer;color:var(--ink);font-family:inherit;transition:.12s}
+.tabs button.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (max-width:520px){
+  .an-card{padding:13px} .an-card b{font-size:22px}
+  .an-days{height:80px;gap:3px} .an-day .d{font-size:9px}
+}
 .review{margin-top:8px}
 .review h3{font-size:16px;margin:20px 0 12px}
 .rev-item{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;background:var(--card)}
@@ -440,6 +561,7 @@ button{font-family:inherit;touch-action:manipulation}
   <div class="wrap inner">
     <div class="brand"><div class="logo" id="logoIc"></div><span>بنك الأسئلة التفاعلي</span></div>
     <div class="spacer"></div>
+    <button class="icon-btn ghost" id="anBtn" title="تحليلات الأداء" aria-label="تحليلات الأداء"><span id="anIc"></span><span class="lbl"> التحليلات</span></button>
     <button class="icon-btn ghost" id="homeBtn" title="الصفحة الرئيسية"><span id="homeIc"></span> الرئيسية</button>
     <button class="icon-btn" id="themeBtn" title="تبديل المظهر"></button>
   </div>
@@ -461,6 +583,8 @@ button{font-family:inherit;touch-action:manipulation}
   <div class="foot-note">تم تحويل بنوك الأسئلة PDF إلى موقع تفاعلي — إجابات نموذجية وفق ملفات المقررات.</div>
 </footer>
 
+<div id="pwaToast" class="pwa-toast" role="status" aria-live="polite"></div>
+
 <script>
 const DATA = __DATA__;
 
@@ -479,6 +603,7 @@ const IC = {
   exam: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M9 2.5h6v3H9zM9.5 11l1.6 1.6L14.5 9M9.5 17h5"/></svg>',
   eye: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>',
   wa: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.12-.41-2.14-1.32-.79-.71-1.33-1.58-1.48-1.88-.15-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48 0 1.47 1.06 2.88 1.21 3.08.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.13-.27-.2-.57-.35M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.87 9.87 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.83 9.83 0 0 0 12.04 2m0 18.13h-.01c-1.5 0-2.97-.4-4.25-1.16l-.3-.18-3.12.82.83-3.04-.2-.31a8.23 8.23 0 0 1-1.26-4.36c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.19 8.19 0 0 1 2.41 5.83c0 4.54-3.7 8.22-8.18 8.22"/></svg>',
+  search: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>',
   undo: '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h11a5 5 0 0 1 0 10h-6"/><path d="M8 5 4 9l4 4"/></svg>'
 };
 const EMO = {ethics: IC.scale, invest: IC.chart, acct: IC.calc, prog: IC.code, macro: IC.book, gov: IC.bank};
@@ -488,6 +613,16 @@ const FIGS = __FIGS__;
 /* ---------- helpers ---------- */
 const $ = (s, el=document) => el.querySelector(s);
 const app = $('#app');
+
+/* Escape untrusted text before it is interpolated into an innerHTML template.
+   Every string that comes from data.json (stem, options, notes, course and
+   section titles) must pass through here. Keep this as the single choke point
+   so a future edit cannot accidentally reintroduce raw interpolation. */
+const ESC_MAP = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+function esc(value){
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"']/g, ch => ESC_MAP[ch]);
+}
 const LETTERS = ['أ','ب','ج','د','هـ'];
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d }catch(e){ return d } },
@@ -495,42 +630,513 @@ const store = {
 };
 
 const SKEY = 'qb.session';
-const RKEY = 'qb.review.v1';
-function loadReview(){
-  const value = store.get(RKEY, {});
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+/* ------------------------------------------------------------------ *
+ * Attempt history
+ *
+ * Separate from the mistake log on purpose (see ROADMAP §3.3):
+ *   - qb.review.v1  = "which questions still need revision" (small, pruned)
+ *   - qb.history.v1 = "everything the student has ever answered" (audit trail)
+ * The history is the source of truth for analytics. It is capped per session
+ * and trimmed by age + count so localStorage cannot grow without bound.
+ * ------------------------------------------------------------------ */
+const HKEY = 'qb.history.v1';
+const HISTORY_MAX_ENTRIES = 5000;      // hard cap on stored attempts
+const HISTORY_MAX_AGE_DAYS = 400;      // older attempts are dropped
+const SESSION_MAX_ATTEMPTS = 5000;     // safety valve for one giant session
+
+function emptyHistory(){
+  return {v:1, attempts:[], sessions:[], streak:{current:0,best:0,lastDay:null}};
 }
-function recordAttempt(q, answer, course){
-  if (!q.id) return;
-  const records = loadReview();
-  const previous = records[q.id] || {
-    questionId:q.id, courseId:q.courseId || course?.id || '',
-    courseTitle:q.courseTitle || course?.title || '',
-    wrongCount:0, correctCount:0, correctStreak:0, firstWrongAt:null
-  };
-  const correct = answer === q.ans, now = Date.now();
-  previous.courseId = q.courseId || course?.id || previous.courseId;
-  previous.courseTitle = q.courseTitle || course?.title || previous.courseTitle;
-  previous.lastAttemptAt = now;
-  previous.lastOutcome = correct ? 'correct' : 'wrong';
-  if (correct){
-    previous.correctCount = (previous.correctCount || 0) + 1;
-    previous.correctStreak = (previous.correctStreak || 0) + 1;
-  } else {
-    previous.wrongCount = (previous.wrongCount || 0) + 1;
-    previous.correctStreak = 0;
-    previous.firstWrongAt = previous.firstWrongAt || now;
-    previous.lastWrongAt = now;
+function loadHistory(){
+  const raw = store.get(HKEY, null);
+  if (!raw || typeof raw !== 'object') return emptyHistory();
+  if (!Array.isArray(raw.attempts)) raw.attempts = [];
+  if (!Array.isArray(raw.sessions)) raw.sessions = [];
+  if (!raw.streak || typeof raw.streak !== 'object') raw.streak = {current:0,best:0,lastDay:null};
+  return raw;
+}
+function saveHistory(h){ store.set(HKEY, h); }
+
+function dayKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function dayDiff(a, b){
+  /* whole days between two YYYY-MM-DD keys, ignoring time of day */
+  const pa = a.split('-').map(Number), pb = b.split('-').map(Number);
+  const ta = Date.UTC(pa[0], pa[1]-1, pa[2]), tb = Date.UTC(pb[0], pb[1]-1, pb[2]);
+  return Math.round((tb - ta) / 86400000);
+}
+
+/* Answer codes: an integer >= 0 is the chosen option; -1 means "revealed". */
+function recordHistoryAttempt(q, answer, course){
+  if (!q || !q.id) return;
+  const h = loadHistory();
+  const now = Date.now();
+  const outcome = answer === -1 ? 'revealed' : (answer === q.ans ? 'correct' : 'wrong');
+
+  h.attempts.push({
+    id: q.id,
+    t: now,
+    o: outcome,
+    a: Number.isInteger(answer) ? answer : -1,
+    c: q.courseId || course?.id || '',
+    s: q.sectionId || '',
+  });
+
+  /* ---- streak: one increment per calendar day with activity ---- */
+  const today = dayKey(now);
+  const st = h.streak;
+  if (st.lastDay !== today){
+    st.current = st.lastDay && dayDiff(st.lastDay, today) === 1 ? (st.current || 0) + 1 : 1;
+    st.lastDay = today;
+    st.best = Math.max(st.best || 0, st.current);
   }
-  if (previous.wrongCount > 0 && previous.correctStreak < 2) records[q.id] = previous;
-  else delete records[q.id];
-  store.set(RKEY, records);
+
+  pruneHistory(h, now);
+  saveHistory(h);
 }
-function getReviewCount(){
-  const records = loadReview(); let count = 0;
-  DATA.forEach(c=>c.sections.forEach(s=>s.questions.forEach(q=>{if(records[q.id]) count++;})));
-  return count;
+
+/* A "session" is one quiz run. Opened when a quiz starts, closed on finish. */
+function openHistorySession(meta){
+  const h = loadHistory();
+  h.sessions.push(Object.assign({
+    id: 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    start: Date.now(),
+    end: null,
+    mode: 'study',
+    courseId: '',
+    courseTitle: '',
+    isReview: false,
+    total: 0,
+    answered: 0,
+    correct: 0,
+    wrong: 0,
+    revealed: 0,
+    timedOut: false,
+  }, meta));
+  pruneHistory(h, Date.now());
+  saveHistory(h);
+  return h.sessions[h.sessions.length - 1].id;
 }
+function updateHistorySession(){
+  if (!state.sessionId) return;
+  const h = loadHistory();
+  const rec = h.sessions.find(x => x.id === state.sessionId);
+  if (!rec) return;
+  const total = state.quiz.length;
+  let correct = 0, wrong = 0, revealed = 0, answered = 0;
+  state.quiz.forEach((q, i) => {
+    const a = state.answers[i];
+    if (a === undefined) return;
+    answered++;
+    if (a === -1) revealed++;
+    else if (a === q.ans) correct++;
+    else wrong++;
+  });
+  rec.answered = answered; rec.correct = correct;
+  rec.wrong = wrong; rec.revealed = revealed; rec.total = total;
+  saveHistory(h);
+}
+function closeHistorySession(finished){
+  if (!state.sessionId) return;
+  updateHistorySession();
+  const h = loadHistory();
+  const rec = h.sessions.find(x => x.id === state.sessionId);
+  if (rec){
+    rec.finished = !!finished;
+    if (finished){
+      rec.end = Date.now();
+      rec.timedOut = !!state.timeExpired;
+      rec.pct = rec.total ? Math.round(rec.correct / rec.total * 100) : 0;
+    }
+  }
+  saveHistory(h);
+}
+
+function pruneHistory(h, now){
+  const cutoff = now - HISTORY_MAX_AGE_DAYS * 86400000;
+  if (h.attempts.length > HISTORY_MAX_ENTRIES){
+    h.attempts = h.attempts.slice(-HISTORY_MAX_ENTRIES);
+  }
+  if (h.sessions.length > 400) h.sessions = h.sessions.slice(-400);
+  /* age trim is cheap enough to do inline: keep it O(n) with a single filter */
+  if (h.attempts.length && h.attempts[0].t < cutoff){
+    h.attempts = h.attempts.filter(a => a.t >= cutoff);
+  }
+}
+
+const RKEY = 'qb.review.v1';   // legacy mistake log -- read-only, migrated on load
+const MKEY = 'qb.mastery.v1';  // mastery model (replaces the legacy log)
+
+/* ------------------------------------------------------------------ *
+ * Spaced repetition / mastery model  (ROADMAP §3.1)
+ *
+ * Replaces the old "drop the question after two correct answers" rule with a
+ * graded level per question. The level decides when the question is due again:
+ *
+ *   level 0  just missed ............ due immediately
+ *   level 1  answered once ......... +1 day
+ *   level 2  twice in a row ........ +3 days
+ *   level 3  solid ................. +1 week
+ *   level 4  stable ................ +2 weeks
+ *   level 5+ mastered .............. +4 weeks (kept out of the queue)
+ *
+ * A wrong answer knocks the level back to 0, so a "mastered" question that
+ * starts failing returns to practice immediately. Levels are deliberately
+ * capped so no question can be parked forever on the strength of one good day.
+ * ------------------------------------------------------------------ */
+const MASTERY_INTERVALS = [0, 1, 3, 7, 14, 28];   // days, indexed by level
+const MASTERY_MAX_LEVEL = MASTERY_INTERVALS.length - 1;
+const MASTERY_MASTERED = 5;                        // level 5 = retired from the queue
+
+function emptyMastery(){ return { v:1, items:{} }; }
+
+function loadMastery(){
+  const raw = store.get(MKEY, null);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return migrateLegacyReview();
+  if (!raw.items || typeof raw.items !== 'object' || Array.isArray(raw.items)) raw.items = {};
+  return raw;
+}
+
+/* One-time conversion of the old mistake log so nobody loses their queue. */
+function migrateLegacyReview(){
+  const legacy = store.get(RKEY, null);
+  const m = emptyMastery();
+  if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)){
+    const now = Date.now();
+    for (const [id, rec] of Object.entries(legacy)){
+      if (!rec || typeof rec !== 'object') continue;
+      m.items[id] = {
+        id,
+        level: 0,
+        wrong: rec.wrongCount || 0,
+        correct: rec.correctCount || 0,
+        streak: rec.correctStreak || 0,
+        due: now,                        // everything from the old log is due now
+        last: rec.lastAttemptAt || now,
+        courseId: rec.courseId || '',
+        courseTitle: rec.courseTitle || '',
+        firstWrongAt: rec.firstWrongAt || now,
+      };
+    }
+    /* keep the legacy key intact for one release as a safety net */
+  }
+  store.set(MKEY, m);
+  return m;
+}
+
+function masteryFor(m, id){
+  return m.items[id] || null;
+}
+
+/* Fold one answer into the mastery model. */
+function updateMastery(it, answer, now){
+  const m = loadMastery();
+  const correct = answer !== -1 && answer === it.ans;
+  const revealed = answer === -1;
+  const rec = m.items[it.id] || {
+    id: it.id, level: 0, wrong: 0, correct: 0, streak: 0,
+    due: now, last: now, courseId: it.courseId, courseTitle: it.courseTitle,
+    firstWrongAt: null,
+  };
+
+  rec.courseId = rec.courseId || it.courseId || '';
+  rec.courseTitle = rec.courseTitle || it.courseTitle || '';
+  rec.last = now;
+
+  if (correct){
+    rec.correct++;
+    rec.streak++;
+    /* Only a real answer promotes. Revealing the answer is not mastery. */
+    rec.level = Math.min(MASTERY_MAX_LEVEL, (rec.level || 0) + 1);
+  } else {
+    rec.wrong++;
+    rec.streak = 0;
+    rec.level = 0;
+    rec.firstWrongAt = rec.firstWrongAt || now;
+    /* A revealed question counts as "not learned yet" but is not punished
+       as hard as a wrong answer: it stays due immediately either way. */
+    if (revealed) rec.revealed = (rec.revealed || 0) + 1;
+  }
+
+  rec.due = now + MASTERY_INTERVALS[rec.level] * 86400000;
+  m.items[it.id] = rec;
+  store.set(MKEY, m);
+  return rec;
+}
+
+/* Counts only questions that still exist in the bank, so the number shown on
+   the home screen always matches what dueQuestions() will actually serve. */
+function dueCount(now){
+  const m = loadMastery();
+  let n = 0;
+  for (const rec of Object.values(m.items)){
+    if (rec.level >= MASTERY_MASTERED) continue;   // retired
+    if ((rec.due || 0) > now) continue;
+    if (!ITEMS[rec.id]) continue;                  // question left the bank
+    n++;
+  }
+  return n;
+}
+
+/* Due questions, most overdue first; mastered ones are excluded. */
+function dueQuestions(now){
+  const m = loadMastery();
+  const out = [];
+  for (const rec of Object.values(m.items)){
+    if (rec.level >= MASTERY_MASTERED) continue;
+    if ((rec.due || 0) > now) continue;
+    const it = ITEMS[rec.id];
+    if (!it) continue;                       // question removed from the bank
+    out.push({ rec, it });
+  }
+  out.sort((a, b) => (a.rec.due || 0) - (b.rec.due || 0) || (a.rec.level || 0) - (b.rec.level || 0));
+  return out;
+}
+
+/* Counts used by the home panel and the analytics screen. */
+function masterySummary(now){
+  const m = loadMastery();
+  const s = {tracked:0, due:0, mastered:0, byLevel:[0,0,0,0,0,0]};
+  for (const rec of Object.values(m.items)){
+    s.tracked++;
+    const lvl = Math.min(MASTERY_MAX_LEVEL, Math.max(0, rec.level || 0));
+    s.byLevel[lvl]++;
+    if (rec.level >= MASTERY_MASTERED) s.mastered++;
+    else if ((rec.due || 0) <= now && ITEMS[rec.id]) s.due++;
+  }
+  return s;
+}
+
+/* "بعد 3 أيام" / "بعد ساعتين" for the next scheduled review. */
+function nextDueIn(){
+  const m = loadMastery();
+  const now = Date.now();
+  let soonest = Infinity;
+  for (const rec of Object.values(m.items)){
+    if (rec.level >= MASTERY_MASTERED) continue;
+    if ((rec.due || 0) > now && rec.due < soonest) soonest = rec.due;
+  }
+  if (!isFinite(soonest)) return '';
+  const ms = soonest - now;
+  const days = Math.ceil(ms / 86400000);
+  if (days >= 2) return days + ' أيام';
+  const hours = Math.ceil(ms / 3600000);
+  if (hours >= 2) return hours + ' ساعة';
+  return 'ساعة';
+}
+
+/* Small distribution bars shown under the review panel. */
+function masteryBars(m){
+  const labels = ['مبتدئ', 'يتحسن', 'جيد', 'متقن جزئيًا', 'متقن', 'مستقر'];
+  const max = Math.max(1, ...m.byLevel);
+  const rows = m.byLevel.map((n, i) => {
+    const cls = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? '#f59e0b' : 'var(--accent)';
+    return `<div class="lv-row">
+      <span class="lv-lbl">${labels[i]}</span>
+      <div class="lv-track"><i style="width:${Math.round(n/max*100)}%;background:${cls}"></i></div>
+      <span class="lv-n">${n}</span>
+    </div>`;
+  }).join('');
+  return `<div class="lv-wrap">
+    <div class="lv-head">مستويات الإتقان — ${m.tracked} سؤال متتبَّع${m.mastered ? `، ${m.mastered} تم إتقانه` : ''}</div>
+    ${rows}
+  </div>`;
+}
+
+function daysUntil(ts, now){
+  return Math.max(0, Math.ceil((ts - now) / 86400000));
+}
+
+/* Single funnel for every answer the student gives.
+   Order matters: the audit trail is written first so a later failure can never
+   lose the attempt, then the mastery model, then the live session counters. */
+function recordAttempt(q, answer, course){
+  if (!q || !q.id) return;
+  const now = Date.now();
+  recordHistoryAttempt(q, answer, course);
+  updateHistorySession();
+  updateMastery(q, answer, now);
+}
+
+/* Kept for the home screen and the review button: how many questions are due. */
+function getReviewCount(){ return dueCount(Date.now()); }
+
+/* ------------------------------------------------------------------ *
+ * Analytics -- everything here is derived from the attempt history, so the
+ * numbers always match what the student actually did.
+ * ------------------------------------------------------------------ */
+function computeAnalytics(){
+  const h = loadHistory();
+  const stats = {
+    total: 0, correct: 0, wrong: 0, revealed: 0,
+    byCourse: {}, bySection: {}, byDay: {},
+    firstAt: null, lastAt: null, streak: h.streak || {current:0,best:0},
+    uniqueQuestions: new Set(),
+    sessions: h.sessions.length,
+  };
+  for (const a of h.attempts){
+    stats.total++;
+    if (a.o === 'correct') stats.correct++;
+    else if (a.o === 'wrong') stats.wrong++;
+    else stats.revealed++;
+    stats.uniqueQuestions.add(a.id);
+    if (!stats.firstAt || a.t < stats.firstAt) stats.firstAt = a.t;
+    if (!stats.lastAt || a.t > stats.lastAt) stats.lastAt = a.t;
+
+    const courseKey = a.c || 'unknown';
+    if (!stats.byCourse[courseKey]) stats.byCourse[courseKey] = {total:0, correct:0, wrong:0, revealed:0};
+    const bc = stats.byCourse[courseKey];
+    bc.total++; bc[a.o]++;
+
+    if (a.s){
+      const secKey = courseKey + '/' + a.s;
+      if (!stats.bySection[secKey]) stats.bySection[secKey] = {total:0, correct:0, wrong:0, revealed:0};
+      const bs = stats.bySection[secKey];
+      bs.total++; bs[a.o]++;
+    }
+
+    const day = dayKey(a.t);
+    if (!stats.byDay[day]) stats.byDay[day] = {total:0, correct:0};
+    stats.byDay[day].total++;
+    if (a.o === 'correct') stats.byDay[day].correct++;
+  }
+  stats.uniqueCount = stats.uniqueQuestions.size;
+  stats.accuracy = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;
+  return stats;
+}
+
+function accuracyOf(bucket){
+  return bucket && bucket.total ? Math.round(bucket.correct / bucket.total * 100) : 0;
+}
+
+/* Sections ranked worst-first, but only where there is a meaningful sample. */
+function weakSections(stats, minAttempts = 3){
+  return Object.entries(stats.bySection)
+    .map(([key, b]) => {
+      const [courseId, sectionId] = key.split('/');
+      const meta = sectionMeta(courseId, sectionId);
+      return {courseId, sectionId, title: meta.sectionTitle, course: meta.courseTitle,
+              ...b, accuracy: accuracyOf(b)};
+    })
+    .filter(x => x.total >= minAttempts)
+    .sort((a, b) => a.accuracy - b.accuracy || b.total - a.total);
+}
+
+function sectionMeta(courseId, sectionId){
+  const course = DATA.find(c => c.id === courseId);
+  const section = course?.sections.find(x => x.id === sectionId);
+  return {courseTitle: course?.title || courseId, sectionTitle: section?.title || sectionId};
+}
+
+/* Last `days` calendar days, oldest first, for the activity chart. */
+function recentDays(n){
+  const out = [];
+  const now = Date.now();
+  for (let i = n - 1; i >= 0; i--){
+    out.push(dayKey(now - i * 86400000));
+  }
+  return out;
+}
+
+/* Questions answered wrong most often in the history. */
+function hardestQuestions(limit = 10){
+  const h = loadHistory();
+  const agg = new Map();
+  for (const a of h.attempts){
+    if (!agg.has(a.id)) agg.set(a.id, {id:a.id, wrong:0, correct:0, revealed:0, last:0});
+    const row = agg.get(a.id);
+    if (a.o === 'wrong') row.wrong++;
+    else if (a.o === 'correct') row.correct++;
+    else row.revealed++;
+    row.last = Math.max(row.last, a.t);
+  }
+  return [...agg.values()]
+    .filter(r => (r.wrong + r.revealed) > 0 && ITEMS[r.id])
+    .sort((a, b) => (b.wrong + b.revealed) - (a.wrong + a.revealed) || b.last - a.last)
+    .slice(0, limit)
+    .map(r => Object.assign(r, {item: ITEMS[r.id]}));
+}
+
+/* Items the student has never answered at all, newest-first is meaningless
+   here -- we just need the count and a sample for the "keep going" nudge. */
+function unansweredQuestions(){
+  const h = loadHistory();
+  const seen = new Set(h.attempts.map(a => a.id));
+  const out = [];
+  DATA.forEach(c => c.sections.forEach(s => s.items.forEach(it => {
+    if (!seen.has(it.id)) out.push(Object.assign({_course:c, _section:s}, it));
+  })));
+  return out;
+}
+
+/* ------------------------------------------------------------------ *
+ * In-course search
+ *
+ * Scope is deliberately narrow: search only ever looks inside the course the
+ * student is currently viewing. There is no global cross-course search -- the
+ * question bank covers eight unrelated subjects, so a global hit list would mix
+ * results the student cannot act on together.
+ *
+ * Matching is diacritic- and hamza-insensitive: Arabic text extracted from the
+ * source PDFs varies between أ/ا/إ and drops or adds تشكيل, so a literal match
+ * would miss most real queries.
+ * ------------------------------------------------------------------ */
+const AR_DIACRITICS = /[\u064B-\u0652\u0670\u0640]/g;   // تشكيل + تطويل
+const AR_NORMALISE = {
+  'أ':'ا', 'إ':'ا', 'آ':'ا', 'ٱ':'ا',
+  'ى':'ي', 'ئ':'ي', 'ؤ':'و',
+  'ة':'ه',
+};
+function normaliseArabic(text){
+  return String(text || '')
+    .toLowerCase()
+    .replace(AR_DIACRITICS, '')
+    .replace(/[أإآٱىئةؤ]/g, ch => AR_NORMALISE[ch] || ch)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* Every query token must appear somewhere in the question (AND semantics).
+   Returns null when the question does not match, or a small object describing
+   where the hits landed so the UI can highlight/rank them. */
+function matchQuestion(item, tokens){
+  const hay = {
+    q: normaliseArabic(item.q),
+    note: normaliseArabic(item.note),
+    opts: item.opts.map(normaliseArabic),
+  };
+  let score = 0;
+  for (const t of tokens){
+    const inStem = hay.q.includes(t);
+    const inOpt = hay.opts.some(o => o.includes(t));
+    const inNote = hay.note.includes(t);
+    if (!inStem && !inOpt && !inNote) return null;
+    if (inStem) score += 3;
+    else if (inOpt) score += 2;
+    else score += 1;
+  }
+  return {score, inNote: tokens.every(t => hay.note.includes(t))};
+}
+
+/* Search one course's questions. `course` is the only scope -- by construction
+   there is no way to ask this function for results from another course. */
+function searchCourse(course, query){
+  const tokens = normaliseArabic(query).split(' ').filter(Boolean);
+  if (!course || !tokens.length) return [];
+  const hits = [];
+  for (const section of course.sections){
+    for (const item of section.items){
+      const m = matchQuestion(item, tokens);
+      if (!m) continue;
+      hits.push({item, section, score: m.score});
+    }
+  }
+  hits.sort((a, b) => b.score - a.score);
+  return hits;
+}
+
 function saveExamPrefs(){
   store.set('qb.examSettings', {count:state.examCount, timerEnabled:state.timerEnabled, timerMinutes:state.timerMinutes});
 }
@@ -574,14 +1180,17 @@ function dropSession(){ try{localStorage.removeItem(SKEY)}catch(e){} }
 /* normalise every question into {q, opts:[], ans:int, fig} */
 DATA.forEach(c => c.sections.forEach(s => {
   s.items = s.questions.map(raw => {
+    const base = {courseId:c.id, courseTitle:c.title, sectionId:s.id, sectionTitle:s.title,
+                  secType:s.type, fig: raw.fig || null, note: raw.note || ''};
     if (s.type === 'mcq') {
-      return {id:raw.id, q: raw.q, opts: raw.options.slice(), ans: raw.ans,
-              note: raw.note || '', fig: raw.fig || null};
+      return Object.assign(base, {id:raw.id, q: raw.q, opts: raw.options.slice(), ans: raw.ans});
     }
-    return {id:raw.id, q: raw.q, opts: ['صح', 'خطأ'], ans: raw.ans ? 0 : 1,
-            note: raw.note || '', fig: raw.fig || null};
+    return Object.assign(base, {id:raw.id, q: raw.q, opts: ['صح', 'خطأ'], ans: raw.ans ? 0 : 1});
   });
 }));
+/* Fast id -> item lookup used by the history and analytics views. */
+const ITEMS = {};
+DATA.forEach(c => c.sections.forEach(s => s.items.forEach(it => { ITEMS[it.id] = it; })));
 
 const examPrefs = store.get('qb.examSettings', {});
 const state = {
@@ -590,7 +1199,8 @@ const state = {
   examCount:['all','10','20','30','50','100'].includes(String(examPrefs.count))?String(examPrefs.count):'all',
   timerEnabled:!!examPrefs.timerEnabled,
   timerMinutes:Math.min(180,Math.max(1,Number(examPrefs.timerMinutes)||30)),
-  deadline:null, examRecorded:false, timeExpired:false
+  deadline:null, examRecorded:false, timeExpired:false, sessionId:null,
+  searchQuery:''
 };
 let examTimerHandle = null;
 function stopExamTimer(){
@@ -630,6 +1240,7 @@ if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 $('#logoIc').innerHTML = IC.logo;
 $('#waIc').innerHTML = IC.wa;
 $('#homeIc').innerHTML = IC.home;
+$('#anIc').innerHTML = IC.chart;
 function paintThemeBtn(){
   $('#themeBtn').innerHTML = document.documentElement.getAttribute('data-theme') === 'dark' ? IC.sun : IC.moon;
 }
@@ -641,10 +1252,18 @@ $('#themeBtn').onclick = () => {
   paintThemeBtn();
 };
 $('#homeBtn').onclick = () => goHome();
+$('#anBtn').onclick = () => { closeHistorySession(false); updateHistorySession(); dropSession(); stopExamTimer();
+  state.view = 'analytics'; state.course = null; state.isReview = false;
+  render(); window.scrollTo(0,0); };
 
 /* ---------- navigation ---------- */
-function goHome(){stopExamTimer();dropSession();state.view='home';state.course=null;state.isReview=false;render();window.scrollTo(0,0);}
-function openCourse(id){stopExamTimer();dropSession();state.view='course';state.isReview=false;state.course=DATA.find(c=>c.id===id);
+function goHome(){stopExamTimer();closeHistorySession(false);dropSession();state.view='home';state.course=null;state.isReview=false;state.searchQuery='';render();window.scrollTo(0,0);}
+function openCourse(id){stopExamTimer();dropSession();state.view='course';state.isReview=false;
+  /* The search scope is the course, so entering a different course must drop
+     any previous query -- otherwise a term typed in one course would silently
+     be re-run against another. */
+  state.searchQuery='';
+  state.course=DATA.find(c=>c.id===id);
   state.picked=state.course.sections.map(s=>s.id);render();window.scrollTo(0,0);}
 
 /* ---------- render ---------- */
@@ -653,6 +1272,7 @@ function render(){
   else if (state.view === 'course') renderCourse();
   else if (state.view === 'quiz') renderQuiz();
   else if (state.view === 'result') renderResult();
+  else if (state.view === 'analytics') renderAnalytics();
   syncBars();
 }
 
@@ -661,26 +1281,35 @@ function totalQ(c){ return c.sections.reduce((n,s)=>n+s.items.length,0); }
 function renderHome(){
   const best = store.get('qb.best', {});
   const reviewCount = getReviewCount();
+  const mastery = masterySummary(Date.now());
+  const nextDue = nextDueIn();
   const reviewPanel = `
-    <div class="setup" style="margin:0 0 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px">
-        <b style="font-size:15px">مراجعة الأخطاء</b>
-        <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
-          ${reviewCount ? `لديك ${reviewCount} سؤال يحتاج إلى مراجعة` : 'لا توجد أسئلة مسجلة للمراجعة حاليًا'}
+    <div class="setup" style="margin:0 0 20px">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <b style="font-size:15px">المراجعة الذكية</b>
+          <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
+            ${reviewCount
+              ? `لديك ${reviewCount} سؤال مستحق للمراجعة الآن`
+              : mastery.tracked
+                ? `لا يوجد مستحق الآن${nextDue ? ` — أقرب سؤال بعد ${nextDue}` : ''}`
+                : 'لسه ما فيش أسئلة في نظام المراجعة — ابدأ الحل وبيتسجل تقدمك تلقائيًا'}
+          </div>
         </div>
+        <button class="primary" id="reviewBtn" style="padding:12px 20px;font-size:14.5px" ${reviewCount?'':'disabled'}>ابدأ المراجعة</button>
       </div>
-      <button class="primary" id="reviewBtn" style="padding:12px 20px;font-size:14.5px" ${reviewCount?'':'disabled'}>ابدأ المراجعة</button>
+      ${mastery.tracked ? masteryBars(mastery) : ''}
     </div>`;
   const cards = DATA.map(c => {
     const mcqN = c.sections.filter(s=>s.type==='mcq').reduce((n,s)=>n+s.items.length,0);
     const tfN = c.sections.filter(s=>s.type==='tf').reduce((n,s)=>n+s.items.length,0);
     const b = best[c.id];
     return `
-    <div class="course-card" style="--c:${c.color}" onclick="openCourse('${c.id}')">
+    <div class="course-card" style="--c:${esc(c.color)}" data-course="${esc(c.id)}">
       <div class="cc-head">
         <div class="cc-emoji">${EMO[c.id] || IC.book}</div>
         <div>
-          <div class="cc-title">${c.title}</div>
+          <div class="cc-title">${esc(c.title)}</div>
           <div class="cc-meta">${[`${totalQ(c)} سؤال`,
               mcqN?`${mcqN} اختيار من متعدد`:'', tfN?`${tfN} صح/خطأ`:'']
               .filter(Boolean).map(t=>`<span class="ccm">${t}</span>`).join('<span class="ccm sep">•</span>')}</div>
@@ -698,7 +1327,7 @@ function renderHome(){
       <div style="flex:1;min-width:220px">
         <b style="font-size:15px">عندك جلسة لم تكملها</b>
         <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
-          ${sess.isReview?'مراجعة الأخطاء':(DATA.find(c=>c.id===sess.courseId)?.title || '')} — ${(()=>{
+          ${sess.isReview?'مراجعة الأخطاء':esc(DATA.find(c=>c.id===sess.courseId)?.title || '')} — ${(()=>{
             const done = Object.keys(sess.answers||{}).length;
             return done ? `${done} من ${sess.quiz.length} سؤال` : `لسه ما جاوبتش، ${sess.quiz.length} سؤال مستنيينك`;
           })()}
@@ -721,7 +1350,10 @@ function renderHome(){
       </div>
     </div>
     <div class="hero-portrait">
-      <img src="src/figures/medo-developer.png" alt="ميدو، مطوّر الموقع" width="896" height="1200" fetchpriority="high">
+      <picture>
+        <source srcset="src/figures/medo-developer.webp" type="image/webp">
+        <img src="src/figures/medo-developer.png" alt="ميدو، مطوّر الموقع" width="600" height="804" fetchpriority="high" decoding="async">
+      </picture>
     </div>
   </section>
   ${reviewPanel}
@@ -729,6 +1361,9 @@ function renderHome(){
   if ($('#reviewBtn')) $('#reviewBtn').onclick = startReview;
   if ($('#resumeBtn')) $('#resumeBtn').onclick = resumeSession;
   if ($('#dropBtn')) $('#dropBtn').onclick = () => { dropSession(); renderHome(); };
+  document.querySelectorAll('[data-course]').forEach(card => {
+    card.onclick = () => openCourse(card.dataset.course);
+  });
 }
 
 function renderCourse(){
@@ -738,16 +1373,27 @@ function renderCourse(){
   app.innerHTML = `
   <div style="padding-top:22px">
     <button class="icon-btn ghost" onclick="goHome()">→ كل المقررات</button>
-    <h1 style="font-size:26px;margin:16px 0 4px;display:flex;align-items:center;gap:10px"><span style="color:${c.color};display:inline-flex">${EMO[c.id]||''}</span>${c.title}</h1>
+    <h1 style="font-size:26px;margin:16px 0 4px;display:flex;align-items:center;gap:10px"><span style="color:${c.color};display:inline-flex">${EMO[c.id]||''}</span>${esc(c.title)}</h1>
     <p style="color:var(--ink-soft);margin:0 0 4px">${totalQ(c)} سؤال في ${c.sections.length} أقسام${best?` • أفضل نتيجة سابقة: <b>${best}%</b>`:''}</p>
   </div>
   <div class="setup">
     <h2>جهّز جلستك</h2>
     <div class="sub">اختر الأقسام وطريقة الحل ثم ابدأ.</div>
 
+    <div class="label" style="margin-top:0">ابحث داخل المقرر</div>
+    <div class="qsearch">
+      <span class="qsearch-ic" aria-hidden="true">${IC.search}</span>
+      <input type="search" id="courseSearch" value="${esc(state.searchQuery)}"
+             placeholder="اكتب كلمة من نص السؤال أو الشرح…"
+             aria-label="بحث داخل ${esc(c.title)} فقط" autocomplete="off"
+             enterkeyhint="search">
+      ${state.searchQuery ? `<button class="qsearch-x" id="clearSearch" aria-label="مسح البحث">✕</button>` : ''}
+    </div>
+    <div id="searchResults" role="region" aria-live="polite" aria-label="نتائج البحث"></div>
+
     <div class="label">الأقسام</div>
     <div class="seg" id="secSeg">
-      ${c.sections.map(s=>`<button data-id="${s.id}" class="${state.picked.includes(s.id)?'sel':''}">${s.title} (${s.items.length})</button>`).join('')}
+      ${c.sections.map(s=>`<button data-id="${esc(s.id)}" class="${state.picked.includes(s.id)?'sel':''}">${esc(s.title)} (${s.items.length})</button>`).join('')}
       <button id="allSecs" class="${state.picked.length===c.sections.length?'sel':''}">كل الأقسام</button>
     </div>
 
@@ -787,6 +1433,18 @@ function renderCourse(){
     </div>
   </div>`;
 
+  const searchInput = $('#courseSearch');
+  if (searchInput){
+    searchInput.oninput = e => {
+      state.searchQuery = e.target.value;
+      paintSearchResults(c, state.searchQuery);
+      syncClearButton();
+    };
+    searchInput.onkeydown = e => { if (e.key === 'Escape'){ state.searchQuery=''; renderCourse(); } };
+    if (state.searchQuery) paintSearchResults(c, state.searchQuery);
+  }
+  if ($('#clearSearch')) $('#clearSearch').onclick = () => { state.searchQuery=''; renderCourse(); };
+
   $('#secSeg').onclick = e => {
     const b = e.target.closest('button'); if(!b) return;
     if (b.id === 'allSecs'){ state.picked = c.sections.map(s=>s.id); renderCourse(); return; }
@@ -809,6 +1467,84 @@ function renderCourse(){
   $('#startBtn').onclick = () => startQuiz();
 }
 
+/* The ✕ button is rendered by the template only when a query exists, so it has
+   to be added and removed as the field goes from empty to non-empty. */
+function syncClearButton(){
+  const wrap = document.querySelector('.qsearch');
+  if (!wrap) return;
+  const existing = document.getElementById('clearSearch');
+  const hasText = !!state.searchQuery;
+  if (hasText && !existing){
+    const btn = document.createElement('button');
+    btn.className = 'qsearch-x';
+    btn.id = 'clearSearch';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'مسح البحث');
+    btn.textContent = '✕';
+    btn.onclick = () => { state.searchQuery = ''; renderCourse(); };
+    wrap.appendChild(btn);
+  } else if (!hasText && existing){
+    existing.remove();
+  }
+}
+
+/* Paint the search results panel. Called on every keystroke, so it must stay
+   cheap: searchCourse() is a plain linear scan over one course (~120 items). */
+function paintSearchResults(course, query){
+  const box = $('#searchResults');
+  if (!box) return;
+  const q = (query || '').trim();
+  if (!q){ box.innerHTML = ''; return; }
+
+  const started = performance.now();
+  const hits = searchCourse(course, q);
+  const elapsed = Math.round(performance.now() - started);
+  const total = course.sections.reduce((n, sec) => n + sec.items.length, 0);
+
+  if (!hits.length){
+    box.innerHTML = `<div class="srch-empty">
+      <b>مفيش نتائج لـ «${esc(q)}»</b>
+      <span>جرّب كلمة أقصر أو كلمة من الشرح. البحث داخل ${esc(course.title)} فقط (${total} سؤال).</span>
+    </div>`;
+    return;
+  }
+
+  const MAX_SHOWN = 25;
+  const shown = hits.slice(0, MAX_SHOWN);
+  const rows = shown.map(({item, section}) => `
+    <div class="srch-item" data-search-id="${esc(item.id)}">
+      <div class="srch-q">${esc(item.q)}</div>
+      <div class="srch-meta">
+        <span class="srch-sec">${esc(section.title)}</span>
+        <span class="srch-type">${item.secType === 'tf' ? 'صح/خطأ' : 'اختيار من متعدد'}</span>
+        ${item.note ? '<span class="srch-note-flag">فيه شرح</span>' : ''}
+      </div>
+      <div class="srch-ans"><b>الإجابة:</b> ${esc(item.opts[item.ans])}</div>
+      ${item.note ? `<div class="srch-note">${esc(item.note)}</div>` : ''}
+    </div>`).join('');
+
+  box.innerHTML = `
+    <div class="srch-head">
+      <b>${hits.length} نتيجة</b> من ${total} سؤال في ${esc(course.title)}
+      ${hits.length > MAX_SHOWN ? `<span class="srch-cap">— أول ${MAX_SHOWN} بس</span>` : ''}
+      <span class="srch-time">${elapsed} ms</span>
+    </div>
+    <div class="srch-list">${rows}</div>
+    ${hits.length > 1 ? `<button class="primary" id="practiseResults" style="margin-top:12px;padding:11px 18px;font-size:14px">تدرّب على النتائج (${Math.min(hits.length, MAX_SHOWN)})</button>` : ''}`;
+
+  const practise = $('#practiseResults');
+  if (practise) practise.onclick = () => {
+    const pool = hits.slice(0, MAX_SHOWN).map(({item, section}) => ({
+      ...item, sec: section.title, secType: section.type,
+    }));
+    stopExamTimer(); dropSession();
+    state.searchQuery = '';
+    state.course = {id:'__search', title:'نتائج البحث', color:'var(--accent)', sections:[]};
+    state.isReview = false;
+    startQuiz(pool, {label: 'نتائج البحث'});
+  };
+}
+
 function shuffleArr(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
 
 function buildPool(sectionIds, filterFn){
@@ -820,17 +1556,25 @@ function buildPool(sectionIds, filterFn){
   return pool;
 }
 function startReview(){
-  const records=loadReview(),pool=[];
-  DATA.forEach(c=>c.sections.forEach(s=>s.items.forEach(it=>{
-    if(records[it.id])pool.push({...it,sec:s.title,secType:s.type,courseId:c.id,courseTitle:c.title,reviewRecord:records[it.id]});
-  })));
-  pool.sort((a,b)=>(a.reviewRecord.lastWrongAt||0)-(b.reviewRecord.lastWrongAt||0));
-  if(!pool.length){renderHome();return;}
-  stopExamTimer();state.course={id:'__review',title:'مراجعة الأخطاء',color:'var(--accent)',sections:[]};
-  state.mode='study';state.isReview=true;state.quiz=pool;state.answers={};state.idx=0;state.view='quiz';
-  state.reviewed=false;state.deadline=null;state.examRecorded=false;state.timeExpired=false;
-  render();window.scrollTo(0,0);
+  const due = dueQuestions(Date.now());
+  if (!due.length){ renderHome(); return; }
+  const pool = due.slice(0, 100).map(({it}) => ({
+    ...it, sec: it.sectionTitle, secType: it.secType,
+    courseId: it.courseId, courseTitle: it.courseTitle,
+  }));
+  stopExamTimer();
+  state.course = {id:'__review', title:'مراجعة الأخطاء', color:'var(--accent)', sections:[]};
+  state.mode = 'study'; state.isReview = true;
+  state.quiz = pool; state.answers = {}; state.idx = 0; state.view = 'quiz';
+  state.reviewed = false; state.deadline = null;
+  state.examRecorded = false; state.timeExpired = false;
+  state.sessionId = openHistorySession({
+    mode: 'study', courseId: '__review', courseTitle: 'مراجعة الأخطاء',
+    isReview: true, total: pool.length,
+  });
+  render(); window.scrollTo(0,0);
 }
+
 function startQuiz(pool,options={}){
   let selected=pool?pool.slice():buildPool(state.picked);
   if(!pool&&state.mode==='exam'&&state.examCount!=='all'){
@@ -838,10 +1582,322 @@ function startQuiz(pool,options={}){
     if(limit<selected.length){const chosen=new Set(shuffleArr(selected.map((_,i)=>i)).slice(0,limit));selected=selected.filter((_,i)=>chosen.has(i));}
   }
   state.quiz=state.shuffle?shuffleArr(selected):selected;state.isReview=!!options.review;
+  if(options.label&&state.course)state.course={...state.course,title:options.label};
   state.answers={};state.idx=0;state.view='quiz';state.reviewed=false;
   state.deadline=state.mode==='exam'&&state.timerEnabled?Date.now()+state.timerMinutes*60000:null;
   state.examRecorded=false;state.timeExpired=false;stopExamTimer();
+  state.sessionId = openHistorySession({
+    mode: state.mode,
+    courseId: state.isReview ? '__review' : (state.course?.id || ''),
+    courseTitle: state.isReview ? 'مراجعة الأخطاء' : (state.course?.title || ''),
+    isReview: !!state.isReview,
+    total: state.quiz.length,
+  });
   render();window.scrollTo(0,0);
+}
+
+/* ---------- analytics view ---------- */
+const AN_TABS = [
+  {id:'overview', label:'نظرة عامة'},
+  {id:'courses', label:'المقررات'},
+  {id:'weak', label:'نقاط الضعف'},
+  {id:'sessions', label:'المحاولات'},
+];
+
+function renderAnalytics(){
+  const st = computeAnalytics();
+  const active = state.anTab || 'overview';
+  /* Mastery records can exist while the attempt history is empty (e.g. a
+     migrated legacy review log, or history trimmed by age). Neither store is
+     the single source of truth, so the screen must consider both. */
+  const mastery = masterySummary(Date.now());
+  const hasData = st.total > 0 || mastery.tracked > 0;
+
+  const header = `
+    <div style="padding-top:22px">
+      <button class="icon-btn ghost" id="anBack">→ الرئيسية</button>
+      <h1 style="font-size:26px;margin:16px 0 4px">تحليلات الأداء</h1>
+      <p style="color:var(--ink-soft);margin:0 0 18px">
+        ${hasData
+          ? (st.total
+              ? `ملخّص ${st.total.toLocaleString('ar-EG')} محاولة على ${st.uniqueCount.toLocaleString('ar-EG')} سؤال من ${Object.keys(st.byCourse).filter(k=>k!=='unknown').length} مقررات.`
+              : `${mastery.tracked.toLocaleString('ar-EG')} سؤال متتبَّع في نظام المراجعة.`)
+          : 'لسه ما فيش بيانات. ابدأ الحل وهتلاقي هنا كل تحليلاتك.'}
+      </p>
+    </div>`;
+
+  const tabs = `<div class="tabs" role="tablist" aria-label="أقسام التحليلات">${
+    AN_TABS.map(t => `<button role="tab" aria-selected="${t.id === active}" data-antab="${t.id}"
+      class="${t.id === active ? 'sel' : ''}">${t.label}</button>`).join('')}</div>`;
+
+  if (!hasData) {
+    app.innerHTML = `${header}${tabs}
+      <div class="an-panel"><div class="an-empty">
+        مفيش محاولات مسجّلة لحد الآن.<br>
+        <button class="primary" id="anStart" style="margin-top:14px">ابدأ الحل</button>
+      </div></div>`;
+    $('#anBack').onclick = goHome;
+    if ($('#anStart')) $('#anStart').onclick = goHome;
+    wireAnTabs();
+    return;
+  }
+
+  let body = '';
+  if (active === 'overview') body = analyticsOverview(st);
+  else if (active === 'courses') body = analyticsCourses(st);
+  else if (active === 'weak') body = analyticsWeak(st);
+  else body = analyticsSessions(st);
+
+  app.innerHTML = `${header}${tabs}<div id="anBody">${body}</div>`;
+  $('#anBack').onclick = goHome;
+  wireAnTabs();
+  wireAnActions();
+}
+
+function wireAnTabs(){
+  document.querySelectorAll('[data-antab]').forEach(b => {
+    b.onclick = () => { state.anTab = b.dataset.antab; renderAnalytics(); window.scrollTo(0,0); };
+  });
+}
+function wireAnActions(){
+  const start = $('#anPracticeWeak');
+  if (start) start.onclick = () => {
+    const st = computeAnalytics();
+    const weakIds = new Set(weakSections(st).slice(0, 5).map(w => w.courseId + '/' + w.sectionId));
+    const pool = [];
+    DATA.forEach(c => c.sections.forEach(sec => {
+      if (!weakIds.has(c.id + '/' + sec.id)) return;
+      sec.items.forEach(it => pool.push({...it, sec: sec.title, secType: sec.type}));
+    }));
+    if (!pool.length) return;
+    state.isReview = false;
+    state.course = {id:'__weak', title:'نقاط الضعف', color:'var(--accent)', sections:[]};
+    startQuiz(pool, {label:'نقاط الضعف'});
+  };
+  const unpractised = $('#anPracticeNew');
+  if (unpractised) unpractised.onclick = () => {
+    const pool = unansweredQuestions().slice(0, 100);
+    if (!pool.length) return;
+    state.course = {id:'__new', title:'أسئلة جديدة', color:'var(--accent)', sections:[]};
+    state.isReview = false;
+    startQuiz(pool, {label:'أسئلة جديدة'});
+  };
+}
+
+function analyticsOverview(st){
+  const pctBar = (pct, color) =>
+    `<div class="an-bar"><span class="lbl"></span><span class="val">${pct}%</span>
+       <div class="track"><i style="width:${pct}%;background:${color}"></i></div></div>`;
+
+  const days = recentDays(14);
+  const maxDay = Math.max(1, ...days.map(d => (st.byDay[d]?.total) || 0));
+  const chart = days.map(d => {
+    const row = st.byDay[d] || {total:0, correct:0};
+    const h = Math.round(row.total / maxDay * 100);
+    const okH = row.total ? Math.round(row.correct / row.total * 100) : 0;
+    const [, mm, dd] = d.split('-');
+    return `<div class="an-day" title="${d}: ${row.total} محاولة، ${row.correct} صحيحة">
+      <span class="n">${row.total || ''}</span>
+      <div class="col" style="height:${Math.max(h, 3)}%"><i style="height:${okH}%"></i></div>
+      <span class="d">${dd}/${mm}</span>
+    </div>`;
+  }).join('');
+
+  const activeDays = Object.keys(st.byDay).length;
+  return `
+    <div class="an-grid">
+      <div class="an-card accent"><b>${st.total.toLocaleString('ar-EG')}</b><span>إجمالي المحاولات</span></div>
+      <div class="an-card ok"><b>${st.accuracy}%</b><span>نسبة الإجابات الصحيحة</span></div>
+      <div class="an-card"><b>${st.uniqueCount.toLocaleString('ar-EG')}</b><span>سؤال مختلف</span></div>
+      <div class="an-card"><b>${st.streak?.current || 0}</b><span>أيام متتالية</span></div>
+    </div>
+
+    <div class="an-panel">
+      <h3>آخر 14 يوم</h3>
+      <p class="hint">العمود = عدد المحاولات، والجزء الأخضر = الإجابات الصحيحة. (${activeDays} يوم نشاط مسجّل)</p>
+      <div class="an-days">${chart}</div>
+    </div>
+
+    <div class="an-panel">
+      <h3>توزيع الإجابات</h3>
+      <p class="hint">كل محاولة مسجّلة، بما فيها الأسئلة التي أظهرت إجابتها بدون حل.</p>
+      <div class="an-bar"><span class="lbl">صحيحة</span><span class="val">${st.correct}</span>
+        <div class="track"><i style="width:${Math.round(st.correct/st.total*100)}%;background:var(--ok)"></i></div></div>
+      <div class="an-bar"><span class="lbl">خاطئة</span><span class="val">${st.wrong}</span>
+        <div class="track"><i style="width:${Math.round(st.wrong/st.total*100)}%;background:var(--bad)"></i></div></div>
+      <div class="an-bar"><span class="lbl">تم إظهار الإجابة</span><span class="val">${st.revealed}</span>
+        <div class="track"><i style="width:${Math.round(st.revealed/st.total*100)}%;background:#f59e0b"></i></div></div>
+    </div>
+
+    ${unansweredCountPanel()}
+  `;
+}
+
+function unansweredCountPanel(){
+  const remaining = unansweredQuestions().length;
+  if (!remaining) return '';
+  return `<div class="an-panel">
+    <h3>أسئلة لم تجرّبها بعد</h3>
+    <p class="hint">${remaining.toLocaleString('ar-EG')} سؤال من إجمالي ${DATA.reduce((n,c)=>n+c.sections.reduce((m,s)=>m+s.items.length,0),0).toLocaleString('ar-EG')} لم تُحل بعد.</p>
+    <button class="primary" id="anPracticeNew" style="padding:11px 18px;font-size:14px">حل 100 سؤال جديد</button>
+  </div>`;
+}
+
+function analyticsCourses(st){
+  const rows = DATA.map(c => {
+    const b = st.byCourse[c.id] || {total:0, correct:0};
+    return {course:c, ...b, accuracy: b.total ? Math.round(b.correct/b.total*100) : null};
+  }).filter(r => r.total > 0)
+    .sort((a, b) => b.accuracy - a.accuracy);
+
+  if (!rows.length) return '<div class="an-panel"><div class="an-empty">لا توجد محاولات في أي مقرر بعد.</div></div>';
+
+  const bars = rows.map(r => {
+    const color = r.accuracy >= 70 ? 'var(--ok)' : r.accuracy >= 50 ? '#f59e0b' : 'var(--bad)';
+    return `<div class="an-bar">
+      <span class="lbl">${esc(r.course.title)}</span>
+      <span class="val">${r.correct}/${r.total} · ${r.accuracy}%</span>
+      <div class="track"><i style="width:${r.accuracy}%;background:${color}"></i></div>
+    </div>`;
+  }).join('');
+
+  const sections = Object.entries(st.bySection)
+    .map(([key, b]) => {
+      const [courseId, sectionId] = key.split('/');
+      const meta = sectionMeta(courseId, sectionId);
+      return {title: meta.sectionTitle, course: meta.courseTitle, ...b, accuracy: accuracyOf(b)};
+    })
+    .sort((a, b) => b.accuracy - a.accuracy || b.total - a.total);
+
+  const secRows = sections.map(sec => `<div class="an-bar">
+      <span class="lbl">${esc(sec.title)}</span>
+      <span class="val">${sec.correct}/${sec.total} · ${sec.accuracy}%</span>
+      <div class="track"><i style="width:${sec.accuracy}%;background:${sec.accuracy>=70?'var(--ok)':sec.accuracy>=50?'#f59e0b':'var(--bad)'}"></i></div>
+    </div>`).join('');
+
+  return `
+    <div class="an-panel"><h3>الأداء لكل مقرر</h3>
+      <p class="hint">مرتّبة من الأفضل إلى الأقل.</p>${bars}</div>
+    <div class="an-panel"><h3>الأداء لكل قسم</h3>
+      <p class="hint">${sections.length} قسم جرى عليه حل.</p>${secRows}</div>`;
+}
+
+/* Mastery distribution + the questions waiting for review. */
+function masteryPanel(){
+  const now = Date.now();
+  const sum = masterySummary(now);
+  if (!sum.tracked) return '';
+  const labels = ['مبتدئ', 'يتحسن', 'جيد', 'متقن جزئيًا', 'متقن', 'مستقر'];
+  const max = Math.max(1, ...sum.byLevel);
+  const rows = sum.byLevel.map((n, i) => {
+    const colour = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? '#f59e0b' : 'var(--accent)';
+    return `<div class="lv-row">
+      <span class="lv-lbl">${labels[i]}</span>
+      <div class="lv-track"><i style="width:${Math.round(n/max*100)}%;background:${colour}"></i></div>
+      <span class="lv-n">${n}</span>
+    </div>`;
+  }).join('');
+
+  const upcoming = Object.values(loadMastery().items)
+    .filter(r => r.level < MASTERY_MASTERED && (r.due || 0) > now && ITEMS[r.id])
+    .sort((a, b) => a.due - b.due)
+    .slice(0, 5)
+    .map(r => {
+      const it = ITEMS[r.id];
+      const days = daysUntil(r.due, now);
+      return `<div class="sess">
+        <div class="t"><b>${esc(it.courseTitle)}</b> <span>${esc(it.sectionTitle)} · المستوى ${r.level} من ${MASTERY_MAX_LEVEL}</span></div>
+        <div class="p" style="color:var(--ink-soft)">${days ? days + ' يوم' : 'قريبًا'}</div>
+      </div>`;
+    }).join('');
+
+  return `<div class="an-panel">
+    <h3>نظام المراجعة الذكية</h3>
+    <p class="hint">${sum.tracked} سؤال متتبَّع · ${sum.due} مستحق الآن · ${sum.mastered} تم إتقانه (مستبعد من القائمة)</p>
+    <div class="lv-wrap" style="margin-top:6px;padding-top:0;border-top:0">${rows}</div>
+    ${upcoming ? `<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <div class="lv-head">أقرب أسئلة في الانتظار</div>${upcoming}</div>` : ''}
+  </div>`;
+}
+
+function analyticsWeak(st){
+  const weak = weakSections(st).slice(0, 8);
+  const hard = hardestQuestions(8);
+  const strong = Object.entries(st.bySection)
+    .map(([k, b]) => { const [c, s2] = k.split('/'); const m = sectionMeta(c, s2);
+      return {title:m.sectionTitle, course:m.courseTitle, ...b, accuracy: accuracyOf(b)}; })
+    .filter(x => x.total >= 3).sort((a, b) => b.accuracy - a.accuracy).slice(0, 5);
+
+  if (!weak.length && !hard.length) {
+    return '<div class="an-panel"><div class="an-empty">محتاج تحل أسئلة أكتر عشان نحدد نقاط ضعفك بدقة.<br>الحد الأدنى 3 محاولات في القسم.</div></div>';
+  }
+
+  return `
+    ${weak.length ? `<div class="an-panel">
+      <h3>أضعف الأقسام</h3>
+      <p class="hint">أقل نسبة إجابات صحيحة (3 محاولات على الأقل).</p>
+      ${weak.map((w, i) => `<div class="wk">
+        <div class="n">${i+1}</div>
+        <div class="t"><b>${esc(w.title)}</b><span>${esc(w.course)} · ${w.total} محاولة</span></div>
+        <div class="p" style="color:var(--bad)">${w.accuracy}%</div>
+      </div>`).join('')}
+      <button class="primary" id="anPracticeWeak" style="margin-top:14px;padding:11px 18px;font-size:14px">تدرّب على أضعف 5 أقسام</button>
+    </div>` : ''}
+
+    ${strong.length ? `<div class="an-panel">
+      <h3>أقوى الأقسام</h3>
+      <p class="hint">استمر — دي نقاط قوتك.</p>
+      ${strong.map((w, i) => `<div class="wk">
+        <div class="n" style="background:var(--ok-soft);color:var(--ok)">${i+1}</div>
+        <div class="t"><b>${esc(w.title)}</b><span>${esc(w.course)} · ${w.total} محاولة</span></div>
+        <div class="p" style="color:var(--ok)">${w.accuracy}%</div>
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${masteryPanel()}
+
+    ${hard.length ? `<div class="an-panel">
+      <h3>أسئلة أخطأت فيها أكثر</h3>
+      <p class="hint">مرتّبة بعدد الأخطاء، مع السؤال كاملًا للمراجعة.</p>
+      ${hard.map(r => `<div class="hard-q">
+        <div class="hq">${esc(r.item.q)}</div>
+        <div class="hm"><span>✕ ${r.wrong} خطأ</span><span>✓ ${r.correct} صحيح</span>
+          <span>${esc(r.item.courseTitle)}</span></div>
+      </div>`).join('')}
+    </div>` : ''}`;
+}
+
+function analyticsSessions(st){
+  const h = loadHistory();
+  const sessions = h.sessions.slice(-40).reverse();
+  const finished = sessions.filter(s => s.finished);
+  const avg = finished.length
+    ? Math.round(finished.reduce((n, s) => n + (s.pct || 0), 0) / finished.length) : 0;
+
+  if (!sessions.length) return '<div class="an-panel"><div class="an-empty">لا توجد جلسات مسجّلة بعد.</div></div>';
+
+  const rows = sessions.map(s2 => {
+    const when = new Date(s2.start);
+    const date = when.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
+    const time = when.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+    const pct = s2.pct !== undefined ? s2.pct : (s2.total ? Math.round(s2.correct / s2.total * 100) : 0);
+    const color = pct >= 70 ? 'var(--ok)' : pct >= 50 ? '#f59e0b' : 'var(--bad)';
+    const badge = s2.finished ? '' : ' · لم تُكمل';
+    return `<div class="sess">
+      <div class="t"><b>${esc(s2.courseTitle || '—')}${s2.isReview ? ' (مراجعة)' : ''}</b>
+        <span>${date} · ${time} · ${s2.mode === 'exam' ? 'امتحان' : 'تدريب'}${badge}${s2.timedOut ? ' · انتهى الوقت' : ''}</span></div>
+      <div class="p" style="color:${s2.finished ? color : 'var(--ink-soft)'}">${s2.finished ? pct + '%' : s2.answered + '/' + s2.total}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="an-grid">
+      <div class="an-card"><b>${sessions.length}</b><span>جلسة (آخر 40)</span></div>
+      <div class="an-card"><b>${finished.length}</b><span>جلسة مكتملة</span></div>
+      <div class="an-card accent"><b>${avg}%</b><span>متوسط المكتملة</span></div>
+    </div>
+    <div class="an-panel"><h3>آخر الجلسات</h3>
+      <p class="hint">الجلسات غير المكتملة تظهر بنسبة الإنجاز بدلًا من الدرجة.</p>${rows}</div>`;
 }
 
 /* ---------- quiz ---------- */
@@ -870,28 +1926,39 @@ function qCard(q, i, opts={}){
       else if (j===given) cls += ' wrong';
     } else if (given===j) cls += ' sel';
     const mk = (state.mode==='study' && given!==undefined) ? (j===q.ans?'✓':(j===given?'✕':'')) : '';
-    return `<button class="${cls}" data-q="${i}" data-o="${j}">
-      <span class="k">${q.secType==='tf' ? (j===0?'✓':'✗') : LETTERS[j]}</span>
-      <span>${o}</span><span class="mark">${mk}</span>
+    const selected = given === j;
+    const label = state.mode==='study' && given!==undefined
+      ? (j===q.ans ? 'إجابة صحيحة' : selected ? 'إجابة خاطئة' : '')
+      : '';
+    return `<button type="button" class="${cls}" data-q="${i}" data-o="${j}"
+      role="radio" aria-checked="${selected ? 'true' : 'false'}"
+      ${state.mode==='study'&&given!==undefined?'aria-disabled="true"':''}
+      aria-label="${esc(LETTERS[j] || j + 1)}. ${esc(o)}${label ? ' — ' + label : ''}">
+      <span class="k" aria-hidden="true">${q.secType==='tf' ? (j===0?'✓':'✗') : LETTERS[j]}</span>
+      <span>${esc(o)}</span><span class="mark" aria-hidden="true">${mk}</span>
     </button>`;
   }).join('');
   const revealed = given === -1;
   const fb = showFeedback
-    ? `<div class="feedback show ${revealed ? 'ok' : (given===q.ans?'ok':'bad')}">${
-        revealed ? `الإجابة الصحيحة: <b>${q.opts[q.ans]}</b>`
+    ? `<div class="feedback show ${revealed ? 'ok' : (given===q.ans?'ok':'bad')}" role="status" aria-live="polite">${
+        revealed ? `الإجابة الصحيحة: <b>${esc(q.opts[q.ans])}</b>`
         : given===q.ans ? '✓ إجابة صحيحة'
-        : `✕ إجابة غير صحيحة — الإجابة الصحيحة: <b>${q.opts[q.ans]}</b>`
-      }${q.note?`<div style="font-weight:600;opacity:.85;margin-top:4px">${q.note}</div>`:''}</div>`
+        : `✕ إجابة غير صحيحة — الإجابة الصحيحة: <b>${esc(q.opts[q.ans])}</b>`
+      }${q.note?`<div style="font-weight:600;opacity:.85;margin-top:4px">${esc(q.note)}</div>`:''}</div>`
     : '';
   const extra = opts.single ? '' : `
     <div class="q-actions">
       ${state.mode==='study' && given===undefined ? `<button class="mini" data-reveal="${i}">إظهار الإجابة</button>` : ''}
       <button class="mini" data-reset="${i}">مسح الاختيار</button>
     </div>`;
-  return `<article class="q" id="q${i}">
-    <div class="q-head"><div class="qnum">${i+1}</div><div class="qtext">${q.q}${state.isReview?`<span class="q-source">${q.courseTitle||''} · ${q.sec||''}</span>`:''}</div></div>
+  const optCount = q.opts.length;
+  return `<article class="q" id="q${i}" aria-labelledby="qh${i}">
+    <div class="q-head"><div class="qnum" aria-hidden="true">${i+1}</div><div class="qtext" id="qh${i}"><span class="sr-only">السؤال ${i+1} من ${state.quiz.length}. </span>${esc(q.q)}${state.isReview?`<span class="q-source">${esc(q.courseTitle||'')} · ${esc(q.sec||'')}</span>`:''}</div></div>
     ${fig}
-    <div class="opts">${options}</div>
+    <div class="opts" role="radiogroup" aria-labelledby="qh${i}" aria-describedby="qhelp${i}">
+      <span class="sr-only" id="qhelp${i}">${optCount} اختيارات. استخدم أرقام 1 إلى ${optCount} أو الأسهم للتنقل.</span>
+      ${options}
+    </div>
     ${fb}${extra}
   </article>`;
 }
@@ -994,6 +2061,7 @@ function keepScroll(i){
 function finish(timeExpired=false){
   if(state.view==='result')return;
   stopExamTimer();if(timeExpired)state.timeExpired=true;
+  closeHistorySession(true);
   if(state.mode==='exam'&&!state.examRecorded){
     state.quiz.forEach((q,i)=>recordAttempt(q,state.answers[i]===undefined?-1:state.answers[i],state.course));
     state.examRecorded=true;
@@ -1019,17 +2087,17 @@ function renderResult(){
   const skipped = state.quiz.filter((q,i)=>state.answers[i]===undefined || state.answers[i]===-1).length;
   const review = wrong.map(({q,i,a})=>`
     <div class="rev-item">
-      <div class="rev-q">${i+1}. ${q.q}</div>
-      ${q.courseTitle?`<div class="rev-line"><b>المقرر:</b> <span>${q.courseTitle}</span></div>`:''}
-      <div class="rev-line bad"><b>إجابتك:</b> <span>${a===undefined||a===-1?'لم تحل السؤال':q.opts[a]}</span></div>
-      <div class="rev-line ok"><b>الصحيحة:</b> <span>${q.opts[q.ans]}</span></div>
-      ${q.note?`<div class="rev-line" style="color:var(--ink-soft)"><b>ملاحظة:</b> <span>${q.note}</span></div>`:''}
+      <div class="rev-q">${i+1}. ${esc(q.q)}</div>
+      ${q.courseTitle?`<div class="rev-line"><b>المقرر:</b> <span>${esc(q.courseTitle)}</span></div>`:''}
+      <div class="rev-line bad"><b>إجابتك:</b> <span>${a===undefined||a===-1?'لم تحل السؤال':esc(q.opts[a])}</span></div>
+      <div class="rev-line ok"><b>الصحيحة:</b> <span>${esc(q.opts[q.ans])}</span></div>
+      ${q.note?`<div class="rev-line" style="color:var(--ink-soft)"><b>ملاحظة:</b> <span>${esc(q.note)}</span></div>`:''}
     </div>`).join('');
   app.innerHTML = `
   <div class="result">
     <div class="ring" style="--p:${pct};--rc:${color}"><div><b style="color:${color}">${pct}%</b><span>${ok} من ${total}</span></div></div>
     <h2 class="rtitle">${state.timeExpired?'انتهى وقت الامتحان':msg}</h2>
-    <p class="rsub">${state.course.title}${state.timeExpired?' • تم تسليم الإجابات تلقائيًا':''}${skipped?` • ${skipped} سؤال بدون إجابة`:''}</p>
+    <p class="rsub">${esc(state.course.title)}${state.timeExpired?' • تم تسليم الإجابات تلقائيًا':''}${skipped?` • ${skipped} سؤال بدون إجابة`:''}</p>
     <div class="rstats">
       <div class="rstat"><b style="color:var(--ok)">${ok}</b><span>صحيحة</span></div>
       <div class="rstat"><b style="color:var(--bad)">${bad}</b><span>خاطئة</span></div>
@@ -1048,17 +2116,122 @@ function renderResult(){
 }
 
 /* ---------- keyboard ---------- */
+/* Ignore shortcuts while the user is typing in a real form control so the
+   timer field and select boxes keep working normally. */
+function isTypingTarget(el){
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+
 document.addEventListener('keydown', e => {
-  if (state.view !== 'quiz' || state.mode !== 'exam') return;
+  if (state.view !== 'quiz') return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const q = state.quiz[state.idx];
-  if (!q || !q.opts) return;
+  if (isTypingTarget(e.target)) return;
+
   const n = parseInt(e.key, 10);
-  if (n >= 1 && n <= q.opts.length){ state.answers[state.idx] = n-1; renderQuiz(); }
-  if (e.key === 'ArrowLeft'){ if(state.idx < state.quiz.length-1){ state.idx++; renderQuiz(); window.scrollTo(0,0); } }
-  if (e.key === 'ArrowRight'){ if(state.idx > 0){ state.idx--; renderQuiz(); window.scrollTo(0,0); } }
-  if (e.key === 'Enter' && state.idx === state.quiz.length-1) finish();
+  if (state.mode === 'exam'){
+    /* one question per screen: numbers answer, arrows page, Enter submits */
+    const q = state.quiz[state.idx];
+    if (!q || !q.opts) return;
+    if (n >= 1 && n <= q.opts.length){ state.answers[state.idx] = n-1; renderQuiz(); }
+    if (e.key === 'ArrowLeft'){ if(state.idx < state.quiz.length-1){ state.idx++; renderQuiz(); window.scrollTo(0,0); } }
+    if (e.key === 'ArrowRight'){ if(state.idx > 0){ state.idx--; renderQuiz(); window.scrollTo(0,0); } }
+    if (e.key === 'Enter' && state.idx === state.quiz.length-1) finish();
+    return;
+  }
+
+  /* study mode shows every question at once, so the shortcuts act on whichever
+     card currently holds focus (or the first unanswered one). */
+  const card = e.target.closest ? e.target.closest('.q') : null;
+  let index = card ? Number(card.id.replace('q', '')) : -1;
+  if (!(index >= 0) || index >= state.quiz.length){
+    index = state.quiz.findIndex((_, i) => state.answers[i] === undefined);
+  }
+  const q = state.quiz[index];
+  if (!q || !q.opts) return;
+  if (n >= 1 && n <= q.opts.length){
+    if (state.answers[index] !== undefined) return;   // locked after answering
+    state.answers[index] = n-1;
+    recordAttempt(q, n-1, state.course);
+    renderQuiz();
+    keepScroll(index);
+    return;
+  }
+  if (e.key === 'Enter'){
+    if (state.answers[index] === undefined){
+      e.preventDefault();
+      state.answers[index] = -1;
+      recordAttempt(q, -1, state.course);
+      renderQuiz();
+      keepScroll(index);
+    }
+  }
 });
+
+/* ---------- PWA: offline + updates ----------
+   This block must never break the app. Every call is wrapped because file://
+   origins (and some in-app browsers) do not expose serviceWorker at all. */
+(function initPWA(){
+  const banner = document.getElementById('pwaToast');
+  let dismissTimer = null;
+
+  function toast(message, actionLabel, onAction, sticky){
+    if (!banner) return;
+    banner.innerHTML = '';
+    const msg = document.createElement('span');
+    msg.className = 'pwa-msg';
+    msg.textContent = message;
+    banner.appendChild(msg);
+    if (actionLabel){
+      const btn = document.createElement('button');
+      btn.className = 'pwa-act';
+      btn.type = 'button';
+      btn.textContent = actionLabel;
+      btn.onclick = () => { banner.classList.remove('show'); onAction && onAction(); };
+      banner.appendChild(btn);
+    }
+    banner.classList.add('show');
+    if (dismissTimer) clearTimeout(dismissTimer);
+    if (!sticky) dismissTimer = setTimeout(() => banner.classList.remove('show'), 6000);
+  }
+
+  /* Offline / online indicator */
+  function paintConnection(){
+    if (navigator.onLine === false) toast('أنت غير متصل — الموقع شغال من النسخة المحفوظة', null, null, true);
+    else if (banner && banner.classList.contains('show')) banner.classList.remove('show');
+  }
+  window.addEventListener('online', paintConnection);
+  window.addEventListener('offline', paintConnection);
+  if (navigator.onLine === false) paintConnection();
+
+  if (!('serviceWorker' in navigator)) return;
+  if (location.protocol === 'file:') return;   // SW is not available on file://
+
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    /* A new worker is waiting: offer a one-tap refresh. */
+    function offerUpdate(worker){
+      toast('فيه نسخة جديدة من الموقع', 'تحديث', () => {
+        worker.postMessage('SKIP_WAITING');
+      }, true);
+    }
+    if (reg.waiting) offerUpdate(reg.waiting);
+    reg.addEventListener('updatefound', () => {
+      const fresh = reg.installing;
+      if (!fresh) return;
+      fresh.addEventListener('statechange', () => {
+        if (fresh.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(fresh);
+      });
+    });
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+
+    /* Ask for a periodic update check (once a day is plenty). */
+    setInterval(() => reg.update().catch(() => {}), 24 * 60 * 60 * 1000);
+  }).catch((err) => {
+    /* Registration failing must not affect studying. */
+    if (window.console && console.warn) console.warn('SW registration skipped:', err && err.message);
+  });
+})();
 
 render();
 </script>

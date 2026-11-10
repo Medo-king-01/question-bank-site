@@ -1,0 +1,416 @@
+/* PWA / offline tests.
+ *
+ * There is no browser here, so these tests verify the *contract* instead:
+ *  - the manifest is valid, installable (192 + 512 + maskable) and relative;
+ *  - every manifest icon exists on disk and is a real PNG of the stated size;
+ *  - sw.js parses, precaches the shell, and drops old caches on activate;
+ *  - index.html links the manifest and registers the worker;
+ *  - the offline fallback is a real page, never a blank screen.
+ */
+import { it as test, group, assert } from './harness.mjs';
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join, dirname } from 'node:path';
+import vm from 'node:vm';
+
+const SITE = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (p) => readFileSync(join(SITE, p), 'utf8');
+const manifest = JSON.parse(read('manifest.json'));
+const sw = read('sw.js');
+const html = read('index.html');
+/* './some/file' entries inside the service-worker SHELL list */
+const RE_SHELL = /'\.\/([^']+)'/g;
+
+/* A tiny PNG header reader: width/height live in the IHDR chunk. */
+function pngSize(path) {
+  const b = readFileSync(join(SITE, path));
+  assert(b.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${path} is not a PNG`);
+  return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), bytes: b.length };
+}
+
+/* ------------------------------------------------------------------ */
+group('PWA·manifest', () => {
+  test('manifest is valid JSON with the installability basics', () => {
+    assert(manifest.name && manifest.name.length > 3, 'name');
+    assert(manifest.short_name && manifest.short_name.length <= 12, 'short_name must fit under an icon');
+    assert(manifest.start_url, 'start_url');
+    assert(manifest.display === 'standalone', 'display');
+    assert(manifest.theme_color && /^#[0-9a-f]{6}$/i.test(manifest.theme_color), 'theme_color');
+    assert(manifest.background_color && /^#[0-9a-f]{6}$/i.test(manifest.background_color), 'background_color');
+  });
+
+  test('manifest is Arabic and right-to-left', () => {
+    assert(manifest.lang === 'ar', 'lang must be ar');
+    assert(manifest.dir === 'rtl', 'dir must be rtl');
+    /* The name itself must contain Arabic letters, not a transliteration. */
+    assert(/[\u0600-\u06FF]/.test(manifest.name), 'name must be in Arabic');
+  });
+
+  test('start_url and scope are relative so a sub-path deploy works', () => {
+    for (const key of ['start_url', 'scope', 'id']) {
+      if (manifest[key] === undefined) continue;
+      assert(!manifest[key].startsWith('/') || manifest[key] === './',
+        `${key} must not be root-absolute (breaks GitHub Pages sub-paths): ${manifest[key]}`);
+      assert(!/^https?:/i.test(manifest[key]), `${key} must not be absolute`);
+    }
+  });
+
+  test('every manifest icon exists and really is the declared size', () => {
+    assert(Array.isArray(manifest.icons) && manifest.icons.length >= 3, 'need at least 3 icons');
+    for (const icon of manifest.icons) {
+      assert(existsSync(join(SITE, icon.src)), `missing icon file: ${icon.src}`);
+      const [dw, dh] = icon.sizes.split('x').map(Number);
+      const got = pngSize(icon.src);
+      assert(got.w === dw && got.h === dh, `${icon.src} is ${got.w}x${got.h}, manifest says ${icon.sizes}`);
+      /* A PWA icon should not be a placeholder dot. */
+      assert(got.bytes > 600, `${icon.src} looks empty (${got.bytes} bytes)`);
+    }
+  });
+
+  test('icons cover 192, 512 and a maskable variant', () => {
+    const sizes = manifest.icons.map((i) => i.sizes);
+    assert(sizes.includes('192x192'), '192x192 missing');
+    assert(sizes.includes('512x512'), '512x512 missing');
+    assert(manifest.icons.some((i) => (i.purpose || '').includes('maskable')), 'maskable icon missing');
+  });
+
+  test('manifest references no external origin', () => {
+    const raw = JSON.stringify(manifest);
+    assert(!/https?:\/\//.test(raw), 'the app must stay dependency-free');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+group('PWA·service-worker', () => {
+  test('sw.js parses as a valid classic worker script', () => {
+    /* Throws on a syntax error, which is what we want to catch. */
+    new vm.Script(sw, { filename: 'sw.js' });
+  });
+
+  test('sw.js is versioned by the build, not by hand', () => {
+    const m = sw.match(/const CACHE_VERSION = '([^']+)'/);
+    assert(m, 'CACHE_VERSION missing');
+    assert(m[1] !== '__BUILD_ID__', 'build did not substitute the build id');
+    assert(/^[0-9a-f]{8,}$/.test(m[1]), `build id looks wrong: ${m[1]}`);
+  });
+
+  test('the shell precache list contains index.html and every committed icon', () => {
+    const block = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
+    assert(block.includes("'./index.html'"), 'index.html must be precached');
+    for (const icon of manifest.icons) {
+      assert(block.includes(icon.src), `${icon.src} must be precached so the install screen has an icon offline`);
+    }
+    /* Every precached path must actually exist in the repo. */
+    for (const m of block.matchAll(/'\.\/([^']+)'/g)) {
+      assert(existsSync(join(SITE, m[1])), `precached file is missing from the repo: ${m[1]}`);
+    }
+  });
+
+  test('precache uses one-by-one adds so one 404 cannot break the install', () => {
+    assert(!sw.includes('cache.addAll('), 'addAll rejects the whole install on a single 404');
+    assert(/cache\.add\(/.test(sw), 'expected per-asset cache.add');
+  });
+
+  test('navigations are network-first with a cached fallback', () => {
+    assert(sw.includes("req.mode === 'navigate'"), 'navigations must be handled separately');
+    const nav = sw.slice(sw.indexOf("req.mode === 'navigate'"));
+    assert(nav.indexOf('fetch(req)') < nav.indexOf('cache.match'), 'navigation must try the network first');
+    assert(nav.includes('cache.match'), 'navigation needs a cache fallback');
+  });
+
+  test('a failed navigation returns readable Arabic, not a blank page', () => {
+    const fallback = sw.slice(sw.indexOf('new Response('), sw.indexOf('new Response(') + 400);
+    assert(/[\u0600-\u06FF]/.test(fallback), 'offline fallback must be Arabic');
+    assert(fallback.includes('503'), 'offline fallback needs a status');
+  });
+
+  test('activate deletes old question-bank caches but keeps the current one', () => {
+    assert(/caches\.delete\(/.test(sw), 'old caches must be deleted');
+    assert(/startsWith\('question-bank-'\)/.test(sw), 'only our own caches may be deleted');
+    assert(/n !== CACHE_NAME/.test(sw), 'the live cache must be kept');
+  });
+
+  test('every precached URL is relative, so a GitHub Pages sub-path works', () => {
+    const block = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
+    const urls = [...block.matchAll(/"|'(\.\.?\/[^'"]*|[^'"]*)"|'([^']*)'/g)];
+    const entries = [...block.matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    assert(entries.length >= 5, 'expected a real precache list');
+    for (const e of entries) {
+      if (e.startsWith('/*')) continue;             // trailing comment
+      assert(e === './' || e.startsWith('./'),
+        `precache entry must be relative: ${e} — an absolute path breaks /<repo>/ deployments`);
+      assert(!e.startsWith('/'), `root-absolute entry: ${e}`);
+    }
+  });
+
+  test('the worker ignores non-GET and cross-origin requests', () => {
+    assert(sw.includes("if (req.method !== 'GET') return;"), 'must not intercept POST');
+    assert(sw.includes('url.origin !== self.location.origin'), 'must not intercept third parties');
+  });
+
+  test('SKIP_WAITING is honoured (the update button depends on it)', () => {
+    assert(sw.includes("'SKIP_WAITING'"), 'message handler missing');
+    assert(sw.includes('self.skipWaiting()'), 'skipWaiting missing');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+group('PWA·wiring', () => {
+  test('index.html links the manifest', () => {
+    assert(/<link rel="manifest" href="manifest\.json">/.test(html), 'manifest link missing');
+  });
+
+  test('index.html sets theme-color and apple-touch-icon', () => {
+    assert(/<meta name="theme-color"[^>]*>/.test(html), 'theme-color meta missing');
+    assert(/<link rel="apple-touch-icon"/.test(html), 'apple-touch-icon missing');
+    /* The touch icon must be one file, not two competing ones. */
+    assert(html.split('rel="apple-touch-icon"').length - 1 === 1, 'duplicate apple-touch-icon');
+  });
+
+  test('index.html registers sw.js only over http(s)', () => {
+    const i = html.indexOf('initPWA');
+    assert(i > -1, 'initPWA block missing');
+    const block = html.slice(i, i + 3000);
+    assert(block.includes("navigator.serviceWorker.register('sw.js')"), 'registration missing');
+    assert(block.includes("location.protocol === 'file:'"), 'must skip registration on file://');
+  });
+
+  test('sw.js is served next to index.html', () => {
+    assert(existsSync(join(SITE, 'sw.js')), 'sw.js must be at the site root');
+    assert(existsSync(join(SITE, 'manifest.json')), 'manifest.json must be at the site root');
+  });
+
+  test('the offline toast never breaks the page if missing', () => {
+    assert(/getElementById\('pwaToast'\)/.test(html), 'toast element lookup');
+    /* toast() must bail out rather than throw when the element is absent. */
+    assert(/if \(!banner\) return;/.test(html), 'toast must guard against a missing element');
+  });
+
+  test('PWA registration failure is caught, not thrown', () => {
+    const i = html.indexOf("navigator.serviceWorker.register('sw.js')");
+    const block = html.slice(i, i + 1200);
+    assert(block.includes('.catch('), 'registration promise needs a catch');
+  });
+
+  test('index.html still runs with no serviceWorker support at all', () => {
+    /* Everything hangs off a feature test before register() is reached. */
+    const i = html.indexOf('initPWA');
+    const block = html.slice(i, i + 1500);
+    assert(block.includes("'serviceWorker' in navigator"), 'must feature-test serviceWorker');
+  });
+});
+
+
+/* ------------------------------------------------------------------ */
+/* The worker is not only syntax-checked: it is executed in a fake worker
+ * global with a real Map-backed Cache API, so install/activate/fetch are all
+ * exercised as behaviour rather than as string matching. */
+function bootWorker() {
+  const listeners = {};
+  const cacheStore = new Map();
+  const deleted = [];
+  const state = { skipped: false, claimed: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
+
+  function makeCache() {
+    const m = new Map();
+    return {
+      async add(req) {
+        const url = typeof req === 'string' ? req : req.url;
+        if (url.includes('missing')) throw new Error('404');
+        m.set(url, { url, ok: true, clone() { return this; } });
+      },
+      async put(req, res) { m.set(typeof req === 'string' ? req : req.url, res); },
+      async match(req) { return m.get(typeof req === 'string' ? req : req.url); },
+      /* the SAME map the methods above write to, so tests can inspect it */
+      get _map() { return m; },
+    };
+  }
+  const ctx = {
+    URL, Promise, setTimeout, console,
+    caches: {
+      async open() { throw new Error('unexpected'); },
+      async keys() { return [...cacheStore.keys()]; },
+      async delete(n) { deleted.push(n); cacheStore.delete(n); return true; },
+    },
+    fetch: (...a) => state.fetchImpl(...a),
+    Request: class { constructor(u) { this.url = u; } },
+    Response: class {
+      constructor(b, o = {}) { this.body = b; this.status = o.status || 200; this.ok = this.status < 400; }
+      clone() { return this; }
+    },
+  };
+  ctx.self = ctx;
+  ctx.self.location = { origin: 'https://example.com' };
+  ctx.self.addEventListener = (t, fn) => { (listeners[t] ||= []).push(fn); };
+  ctx.self.skipWaiting = () => { state.skipped = true; };
+  ctx.self.clients = { claim: async () => { state.claimed = true; } };
+
+  /* open(name) hands back the same live Map per cache name */
+  const names = new Map();
+  ctx.caches.open = async (name) => {
+    if (!names.has(name)) { const c = makeCache(); names.set(name, c); cacheStore.set(name, c._map); }
+    return names.get(name);
+  };
+
+  vm.createContext(ctx);
+  new vm.Script(sw, { filename: 'sw.js' }).runInContext(ctx);
+
+  const fire = (type, extra = {}) => {
+    const waits = [];
+    const e = { ...extra, waitUntil: (p) => waits.push(p), respondWith: (p) => { e.__res = p; } };
+    (listeners[type] || []).forEach((fn) => fn(e));
+    return { e, waits };
+  };
+  return { fire, state, cacheStore, deleted, listeners };
+}
+
+group('PWA·runtime', () => {
+  test('install precaches the shell and unblocks updates', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const [name] = [...w.cacheStore.keys()];
+    assert(name && name.startsWith('question-bank-'), 'a versioned cache must be created');
+    assert(w.cacheStore.get(name).has('./index.html'), 'index.html must be in the cache');
+    assert(w.state.skipped === true, 'install must call skipWaiting');
+  });
+
+  test('a single missing asset does not abort the install', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);   // the fake cache.add throws on "missing"
+    assert(w.cacheStore.size === 1, 'install must survive a failed asset');
+  });
+
+  test('activate drops stale app caches and claims clients', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.cacheStore.set('question-bank-old', new Map());
+    w.cacheStore.set('someone-else', new Map());
+    await Promise.all(w.fire('activate').waits);
+    assert(w.deleted.includes('question-bank-old'), 'stale app cache must be deleted');
+    assert(!w.deleted.includes('someone-else'), 'other caches must be left alone');
+    assert(w.state.claimed === true, 'activate must claim clients');
+  });
+
+  test('offline navigation is served from cache', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.fetchImpl = async () => { throw new Error('offline'); };
+    const res = await w.fire('fetch', { request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' } }).e.__res;
+    assert(res, 'an offline navigation must still produce a response');
+  });
+
+  test('offline with an empty cache returns an Arabic 503, never a blank screen', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    for (const m of w.cacheStore.values()) m.clear();
+    w.state.fetchImpl = async () => { throw new Error('offline'); };
+    const res = await w.fire('fetch', { request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' } }).e.__res;
+    assert(res.status === 503, 'expected 503');
+    assert(/[\u0600-\u06FF]/.test(String(res.body)), 'offline message must be Arabic');
+  });
+
+  test('POST and cross-origin requests are never intercepted', () => {
+    const w = bootWorker();
+    let hit = false;
+    const probe = (request) => w.listeners.fetch.forEach((fn) =>
+      fn({ request, respondWith() { hit = true; }, waitUntil() {} }));
+    probe({ method: 'POST', mode: 'cors', url: 'https://example.com/api' });
+    assert(hit === false, 'POST must pass through');
+    probe({ method: 'GET', mode: 'cors', url: 'https://wa.me/123' });
+    assert(hit === false, 'cross-origin must pass through');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+group('PWA·connection', () => {
+  const bootDom = async () => {
+    const { JSDOM } = await import('jsdom');
+    const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://example.com/' });
+    await new Promise((r) => setTimeout(r, 250));
+    return dom;
+  };
+
+  test('going offline shows an Arabic banner that blocks nothing', async () => {
+    const dom = await bootDom();
+    const { window } = dom;
+    const toast = window.document.getElementById('pwaToast');
+    assert(toast, 'the toast element must exist');
+    Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+    window.dispatchEvent(new window.Event('offline'));
+    await new Promise((r) => setTimeout(r, 50));
+    assert(toast.classList.contains('show'), 'offline banner must appear');
+    assert(/[\u0600-\u06FF]/.test(toast.textContent), 'offline banner must be Arabic');
+    /* The banner is an overlay: the app underneath keeps working. */
+    assert(window.document.querySelectorAll('[data-course]').length === 8, 'courses must still render offline');
+    dom.window.close();
+  });
+
+  test('coming back online hides the banner', async () => {
+    const dom = await bootDom();
+    const { window } = dom;
+    const toast = window.document.getElementById('pwaToast');
+    Object.defineProperty(window.navigator, 'onLine', { value: false, configurable: true });
+    window.dispatchEvent(new window.Event('offline'));
+    await new Promise((r) => setTimeout(r, 50));
+    assert(toast.classList.contains('show'), 'precondition: banner shown');
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    window.dispatchEvent(new window.Event('online'));
+    await new Promise((r) => setTimeout(r, 50));
+    assert(!toast.classList.contains('show'), 'banner must hide when back online');
+    dom.window.close();
+  });
+
+  test('the app boots when serviceWorker is unavailable (older browsers, file://)', async () => {
+    const dom = await bootDom();
+    assert(!('serviceWorker' in dom.window.navigator), 'jsdom has no serviceWorker: that is the scenario');
+    assert(dom.window.document.querySelectorAll('[data-course]').length === 8, 'the app must still boot');
+    dom.window.close();
+  });
+});
+
+
+/* ------------------------------------------------------------------ */
+group('PWA·payload', () => {
+  test('the app remains self-contained: no external URLs beyond the SVG namespace and the contact link', () => {
+    const urls = [...html.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => m[0]);
+    const allowed = (u) => u.startsWith('http://www.w3.org/') || u.startsWith('https://wa.me');
+    const bad = urls.filter((u) => !allowed(u));
+    assert(bad.length === 0, 'unexpected external dependency: ' + bad.slice(0, 3).join(', '));
+  });
+
+  test('the portrait ships as WebP with a PNG fallback', () => {
+    const webp = join(SITE, 'src/figures/medo-developer.webp');
+    const png = join(SITE, 'src/figures/medo-developer.png');
+    assert(existsSync(webp), 'WebP portrait missing');
+    assert(existsSync(png), 'PNG fallback missing');
+    const head = readFileSync(webp).subarray(0, 12);
+    assert(head.subarray(0, 4).toString() === 'RIFF' && head.subarray(8, 12).toString() === 'WEBP',
+      'the .webp file is not really a WebP');
+    assert(html.includes('medo-developer.webp" type="image/webp"'), 'template must offer the WebP source');
+    assert(html.includes('<picture>'), 'portrait must sit in a <picture>');
+    /* The fallback must be the lighter PNG, not the original 900 KB artwork. */
+    assert(readFileSync(png).length < 200 * 1024,
+      `fallback PNG is ${(readFileSync(png).length / 1024).toFixed(0)} KB — should be resized`);
+    assert(readFileSync(webp).length < 80 * 1024,
+      `WebP portrait is ${(readFileSync(webp).length / 1024).toFixed(0)} KB — too heavy for offline`);
+  });
+
+  test('the complete offline download stays under 1 MB', () => {
+    const shellBlock = sw.slice(sw.indexOf('const SHELL = ['), sw.indexOf('];', sw.indexOf('const SHELL = [')));
+    /* './' and './index.html' are the same file: count it once. */
+    const files = new Set([...shellBlock.matchAll(RE_SHELL).map((m) => m[1])]);
+    files.add('index.html');
+    let total = 0;
+    const parts = [];
+    for (const f of files) { const n = readFileSync(join(SITE, f)).length; total += n; parts.push([f, n]); }
+    assert(total < 1024 * 1024,
+      `the full offline payload is ${(total / 1024).toFixed(0)} KB — a phone install should stay under 1 MB: ` +
+      parts.sort((a, b) => b[1] - a[1]).map(([f, n]) => `${f} ${(n / 1024).toFixed(0)}KB`).join(', '));
+  });
+
+  test('offline payload stays within a sane install budget', () => {
+    const shell = ['index.html', ...manifest.icons.map((i) => i.src)];
+    const total = shell.reduce((sum, f) => sum + readFileSync(join(SITE, f)).length, 0);
+    assert(total < 900 * 1024, `precached shell is ${(total / 1024).toFixed(0)} KB — too heavy for a phone install`);
+  });
+});
