@@ -247,7 +247,7 @@ function bootWorker() {
   const listeners = {};
   const cacheStore = new Map();
   const deleted = [];
-  const state = { skipped: false, claimed: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
+  const state = { skipped: false, claimed: false, putDelay: 15, failPut: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
   /* makeResponse(type, status) builds a response with a Content-Type header */
   const makeResponse = (type, status = 200) => ({
     ok: status < 400, status, url: '',
@@ -264,7 +264,18 @@ function bootWorker() {
         if (state.failRequired && url.includes('index.html')) throw new Error('404 index.html');
         m.set(url, { url, ok: true, body: 'CACHED SHELL', clone() { return this; } });
       },
-      async put(req, res) { m.set(typeof req === 'string' ? req : req.url, res); },
+      /* The real Cache API resolves put() in a later task, not synchronously.
+       * Mimic that with a short delay, otherwise a missing `await` in the
+       * worker would be invisible to these tests. Set state.putDelay = 0 in a
+       * test that does not care. */
+      async put(req, res) {
+        const key = typeof req === 'string' ? req : req.url;
+        if (state.failPut) throw new Error('QuotaExceededError');
+        if (state.putDelay <= 0) { m.set(key, res); return; }
+        await new Promise((r) => setTimeout(r, state.putDelay));
+        m.set(key, res);
+      },
+      async putThrows() { throw new Error('QuotaExceededError'); },
       async match(req) { return m.get(typeof req === 'string' ? req : req.url); },
       /* the SAME map the methods above write to, so tests can inspect it */
       get _map() { return m; },
@@ -470,6 +481,111 @@ group('PWA·runtime', () => {
     await Promise.all(w.fire('install').waits);
     assert(w.cacheStore.size >= 1, 'the cache must still be created');
     assert(w.state.skipped, 'and the worker still activates');
+  });
+
+  test('the shell write is awaited before the response is handed back', async () => {
+    /* A service worker may be terminated as soon as the promise given to
+     * respondWith() settles. If put() is not awaited, the browser can kill the
+     * worker mid-write and the saved copy silently never updates.
+     *
+     * Simulated by writing to the cache only after a delay and checking the
+     * cache the instant the response resolves — no extra waiting. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.putDelay = 40;                       // slow, like real storage
+    const fresh = w.makeResponse('text/html', 200);
+    fresh.body = 'BUILD-2';
+    w.state.fetchImpl = async () => fresh;
+
+    await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' },
+    }).e.__res;
+
+    /* No setTimeout here: this is the exact moment the worker could die. */
+    const shell = [...w.cacheStore.values()].find((m) => m.has('./index.html'));
+    eq(shell.get('./index.html').body, 'BUILD-2',
+      'the cache must already hold the new page when the response resolves');
+  });
+
+  test('a failed cache write still serves the fresh page', async () => {
+    /* QuotaExceededError must not fall through to the offline branch: the user
+     * would see a stale page even though the network just worked. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.failPut = true;
+    const fresh = w.makeResponse('text/html', 200);
+    fresh.body = 'FRESH PAGE';
+    w.state.fetchImpl = async () => fresh;
+
+    const res = await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' },
+    }).e.__res;
+    eq(res.body, 'FRESH PAGE', 'the fresh page must be returned, not the cached one');
+  });
+
+  test('a navigation without a Content-Type is not cached', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const before = [...w.cacheStore.values()].find((m) => m.has('./index.html')).get('./index.html');
+    const untyped = { ok: true, status: 200, body: 'SOMETHING', headers: { get: () => null }, clone() { return this; } };
+    w.state.fetchImpl = async () => untyped;
+    await w.fire('fetch', {
+      request: { method: 'GET', mode: 'navigate', url: 'https://example.com/' },
+    }).e.__res;
+    const after = [...w.cacheStore.values()].find((m) => m.has('./index.html')).get('./index.html');
+    eq(after, before, 'an unverifiable response must not replace the shell');
+  });
+
+  test('an asset without a Content-Type is not cached either', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    const untyped = { ok: true, status: 200, body: 'x', headers: { get: () => null }, clone() { return this; } };
+    w.state.fetchImpl = async () => untyped;
+    const req = { method: 'GET', mode: 'cors', destination: 'image', url: 'https://example.com/x.png' };
+    await w.fire('fetch', { request: req }).e.__res;
+    await new Promise((r) => setTimeout(r, 30));
+    assert(![...w.cacheStore.values()].some((m) => m.has(req.url)),
+      'an untyped response must not be stored as an image');
+  });
+
+  test('an asset refresh rides the event lifetime, not the response', async () => {
+    /* Stale-while-revalidate returns the cached copy immediately, so the worker
+     * cannot await the write before responding. It must hand the write to
+     * waitUntil() instead, or a worker termination drops it. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.putDelay = 30;
+
+    /* The network must answer with a real image type, otherwise cacheable()
+       (correctly) refuses it and there is nothing to write. */
+    w.state.fetchImpl = async () => w.makeResponse('image/png', 200);
+    const req = { method: 'GET', mode: 'cors', destination: 'image', url: 'https://example.com/fresh.png' };
+    const fired = w.fire('fetch', { request: req });
+    const res = await fired.e.__res;             // nothing cached, so network wins
+    assert(res, 'the request must still be answered');
+    /* waitUntil() is called from the fetch().then() continuation, which lands
+     * a task later than the response itself. */
+    await new Promise((r) => setTimeout(r, 5));
+    eq(fired.waits.length, 1, 'the cache write must be registered with waitUntil');
+
+    /* Once the registered work settles, the asset is in the cache. */
+    await Promise.all(fired.waits);
+    assert([...w.cacheStore.values()].some((m) => m.has(req.url)),
+      'the asset must be cached after the registered write settles');
+  });
+
+  test('a failing asset write does not reject the event', async () => {
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+    w.state.failPut = true;
+    w.state.fetchImpl = async () => w.makeResponse('image/png', 200);
+    const req = { method: 'GET', mode: 'cors', destination: 'image', url: 'https://example.com/x.png' };
+    const fired = w.fire('fetch', { request: req });
+    await fired.e.__res;
+    /* Resolving without throwing is the requirement: a quota error must not
+       surface as a failed fetch event. */
+    await Promise.all(fired.waits);
+    assert(true, 'waitUntil work settled without throwing');
   });
 
   test('POST and cross-origin requests are never intercepted', () => {

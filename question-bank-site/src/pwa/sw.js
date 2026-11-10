@@ -82,12 +82,16 @@ self.addEventListener('activate', (event) => {
 function cacheable(req, res) {
   const dest = req.destination || '';
   const type = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
-  if (!type) return true;                       // no info: keep the old behaviour
+  /* Same rule as shellWorthCaching(): no Content-Type means we cannot prove
+     what we received, so it does not go into the cache. */
+  if (!type) return false;
   if (dest === 'image') return type.startsWith('image/');
   if (dest === 'script') return /javascript|ecmascript/.test(type);
   if (dest === 'style') return type.startsWith('text/css');
   if (dest === 'font') return /font|woff/.test(type);
-  /* Documents and anything else may legitimately be HTML. */
+  if (dest === 'document' || dest === 'iframe') return type.includes('text/html');
+  /* JSON/XHR/fetch: the content type is whatever the app asked for, and the
+     app is same-origin only. Let it through once it declared a type. */
   return true;
 }
 
@@ -97,7 +101,10 @@ function shellWorthCaching(res, req) {
   if (!res || !res.ok) return false;                 // 404, 500, opaque errors
   if (res.type === 'opaqueredirect' || res.redirected) return false;
   const type = (res.headers && res.headers.get && res.headers.get('content-type')) || '';
-  if (!type) return true;                            // no header: trust res.ok
+  /* No Content-Type means we cannot prove this is the app. Refusing to cache
+     costs nothing (the page still loads) and keeps the promise of this
+     function honest: only a verifiable HTML document becomes the shell. */
+  if (!type) return false;
   /* The shell is the single-page app, so it must be HTML. A JSON or image body
      served at a navigation URL means we did not get the app. */
   return type.includes('text/html') || type.includes('application/xhtml');
@@ -124,8 +131,19 @@ self.addEventListener('fetch', (event) => {
          * and a non-HTML body (an asset, a redirect stub) is not cached either.
          */
         if (shellWorthCaching(fresh, req)) {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put('./index.html', fresh.clone());
+          /* Awaited on purpose: once the promise passed to respondWith()
+             settles, the browser is free to terminate this worker and an
+             un-awaited put() can be lost. Its own try/catch matters just as
+             much — a full disk (QuotaExceededError) must NOT fall through to
+             the outer catch below, which would serve the stale shell in place
+             of the fresh page the user just received. */
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put('./index.html', fresh.clone());
+          } catch (e) {
+            /* storage full or blocked: the page still loads, it just does not
+               become the saved copy */
+          }
         }
         return fresh;
       } catch (e) {
@@ -144,7 +162,16 @@ self.addEventListener('fetch', (event) => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(req);
     const network = fetch(req).then((res) => {
-      if (res && res.ok && cacheable(req, res)) cache.put(req, res.clone());
+      /* If the asset is already cached the response below does not wait on the
+         network at all, so response-time waiting is no good here. The write is
+         instead attached to the event lifetime with waitUntil(): the browser
+         keeps this worker alive until the put settles. Without it the worker
+         can be killed mid-write and the asset never refreshes. */
+      if (res && res.ok && cacheable(req, res)) {
+        event.waitUntil(
+          cache.put(req, res.clone()).catch(() => {}),   // quota: not fatal
+        );
+      }
       return res;
     }).catch(() => null);
     return cached || (await network) || new Response('', { status: 504 });
