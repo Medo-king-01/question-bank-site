@@ -239,6 +239,59 @@ jobs:
           fi
           echo "OK - the suite caught the retired level-5 question."
 
+      - name: Mutation check - an un-awaited cache write must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/pwa/sw.js")
+          s = p.read_text(encoding="utf-8")
+          # drop the await: the worker may be killed before the write lands
+          needle = "            await cache.put('./index.html', fresh.clone());"
+          assert needle in s, "navigation cache write changed - update this mutation"
+          p.write_text(s.replace(needle, "            cache.put('./index.html', fresh.clone());"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-await.log 2>&1; then
+            echo "::error::The suite passed with an un-awaited shell write."
+            cat /tmp/mutant-await.log
+            exit 1
+          fi
+          echo "OK - the suite caught the un-awaited write."
+
+      - name: Mutation check - caching a response with no Content-Type must fail
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/pwa/sw.js")
+          s = p.read_text(encoding="utf-8")
+          needle = "  if (!type) return false;"
+          assert s.count(needle) == 2, "expected the untyped-response guard in both helpers"
+          p.write_text(s.replace(needle, "  if (!type) return true;"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-ctype.log 2>&1; then
+            echo "::error::The suite passed while unverifiable responses were cached."
+            cat /tmp/mutant-ctype.log
+            exit 1
+          fi
+          echo "OK - the suite caught the unverifiable cache entry."
+
+      - name: Mutation check - a late waitUntil must fail the suite
+        working-directory: question-bank-site
+        run: |
+          # The buggy form is kept in a file: inlining it here breaks YAML
+          # (the arrow functions inside the heredoc confuse the parser).
+          python3 scripts/mutations/late_waituntil.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-late.log 2>&1; then
+            echo "::error::The suite passed with a late waitUntil registration."
+            cat /tmp/mutant-late.log
+            exit 1
+          fi
+          echo "OK - the suite caught the late waitUntil()."
+
       - name: Mutation check - a bank-wide search must fail the suite
         working-directory: question-bank-site
         run: |
