@@ -87,7 +87,7 @@ jobs:
 
       - name: Install test tooling (jsdom only; the site itself has no deps)
         working-directory: question-bank-site
-        run: npm install --no-save --no-audit --no-fund jsdom
+        run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
 
       - name: Run behavioural tests
         working-directory: question-bank-site
@@ -106,7 +106,7 @@ jobs:
           node-version: "22"
       - name: Install test tooling
         working-directory: question-bank-site
-        run: npm install --no-save --no-audit --no-fund jsdom
+        run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
       - name: Mutation check - a broken esc() must fail the suite
         working-directory: question-bank-site
         run: |
@@ -310,6 +310,18 @@ jobs:
             exit 1
           fi
           echo "OK - the suite caught the scope leak."
+
+      - name: Mutation check - an unreadable dark-mode answer chip must fail
+        working-directory: question-bank-site
+        run: |
+          python3 scripts/mutations/dark_chip_contrast.py
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-colour.log 2>&1; then
+            echo "::error::The suite passed with an unreadable answer chip."
+            cat /tmp/mutant-colour.log
+            exit 1
+          fi
+          echo "OK - the suite caught the contrast regression."
 
       - name: Mutation check - a dead timer must fail the suite
         working-directory: question-bank-site

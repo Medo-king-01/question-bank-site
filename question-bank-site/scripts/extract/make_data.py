@@ -252,7 +252,7 @@ def build_all():
     eth_tf = [{'q': clean_q(t['q']), 'ans': t['ans']} for t in tf]
     courses.append({
         'id': 'ethics', 'title': 'أخلاقيات الأعمال والحوكمة', 'emoji': '⚖️',
-        'color': '#7c3aed',
+        'color': '#7c2a27',
         'sections': [
             {'id': 'mcq', 'title': 'الأسئلة الموضوعية (اختيار من متعدد)', 'type': 'mcq', 'questions': eth_mcq},
             {'id': 'tf', 'title': 'أسئلة الصح والخطأ', 'type': 'tf', 'questions': eth_tf},
@@ -280,7 +280,7 @@ def build_all():
             continue
         inv_tf.append({'q': q, 'ans': t['ans']})
     courses.append({
-        'id': 'invest', 'title': 'مبادئ الاستثمار', 'emoji': '📈', 'color': '#0ea5e9',
+        'id': 'invest', 'title': 'مبادئ الاستثمار', 'emoji': '📈', 'color': '#a3312e',
         'sections': [
             {'id': 'mcq', 'title': 'اختيار من متعدد', 'type': 'mcq', 'questions': inv_mcq},
             {'id': 'tf', 'title': 'صح أو خطأ', 'type': 'tf', 'questions': inv_tf},
@@ -290,7 +290,7 @@ def build_all():
     acc_mcq = [{'q': q, 'options': o, 'ans': a} for q, o, a in ACC_MCQ]
     acc_tf = [{'q': q, 'ans': a} for q, a in ACC_TF]
     courses.append({
-        'id': 'acct', 'title': 'محاسبة متوسطة (1)', 'emoji': '🧾', 'color': '#16a34a',
+        'id': 'acct', 'title': 'محاسبة متوسطة (1)', 'emoji': '🧾', 'color': '#8a5a12',
         'sections': [
             {'id': 'tf', 'title': 'السؤال الأول: صح أو خطأ', 'type': 'tf', 'questions': acc_tf},
             {'id': 'mcq', 'title': 'السؤال الثاني: اختر الإجابة الصحيحة', 'type': 'mcq', 'questions': acc_mcq},
@@ -329,7 +329,7 @@ def build_all():
                 continue
             prog_tf.append({'q': q, 'ans': ans, 'note': note, 'section': it.get('section', '')})
     courses.append({
-        'id': 'prog', 'title': 'تصميم برامج الحاسب الآلي', 'emoji': '💻', 'color': '#f59e0b',
+        'id': 'prog', 'title': 'تصميم برامج الحاسب الآلي', 'emoji': '💻', 'color': '#e97371',
         'sections': [
             {'id': 'mcq', 'title': 'اختيار من متعدد', 'type': 'mcq', 'questions': prog_mcq},
             {'id': 'tf', 'title': 'صح أو خطأ', 'type': 'tf', 'questions': prog_tf},
@@ -352,7 +352,7 @@ def build_all():
     mtf = macro_tf()
     mac_tf = [{'q': clean_q(x['q']), 'ans': x['ans']} for x in mtf if x.get('ans') is not None]
     courses.append({
-        'id': 'macro', 'title': 'الاقتصاد الكلي', 'emoji': '📊', 'color': '#ef4444',
+        'id': 'macro', 'title': 'الاقتصاد الكلي', 'emoji': '📊', 'color': '#e52729',
         'sections': [
             {'id': 'mcq', 'title': 'أولًا: اختيار الإجابة الصحيحة', 'type': 'mcq', 'questions': mac_items},
             {'id': 'tf', 'title': 'ثانيًا: صح أو خطأ', 'type': 'tf', 'questions': mac_tf},
@@ -362,7 +362,7 @@ def build_all():
     gov = [{'q': q, 'options': o, 'ans': a} for q, o, a in GOV_MCQ]
     gov_tf = [{'q': q, 'ans': a} for q, a in GOV_TF]
     courses.append({
-        'id': 'gov', 'title': 'اقتصاديات الخدمات الحكومية', 'emoji': '🏛️', 'color': '#0d9488',
+        'id': 'gov', 'title': 'اقتصاديات الخدمات الحكومية', 'emoji': '🏛️', 'color': '#5f1f1d',
         'sections': [
             {'id': 'mcq', 'title': 'اختيار الإجابة المناسبة', 'type': 'mcq', 'questions': gov},
             {'id': 'tf', 'title': 'ضع علامة (✓) أمام العبارات الصحيحة أو (×) أمام الخاطئة', 'type': 'tf', 'questions': gov_tf},
@@ -387,7 +387,7 @@ def build_all():
                 ins_secs.append({'id': '%s-%d' % (key, len(ins_secs)), 'type': typ,
                                  'title': '%s — %s' % (sec.replace('&', 'و'), title), 'questions': g[key]})
     courses.append({'id': 'ins', 'title': 'التأمين وإدارة الخطر', 'emoji': '🛡️',
-                    'color': '#0284c7', 'sections': ins_secs, 'raw': True})
+                    'color': '#a29594', 'sections': ins_secs, 'raw': True})
 
     # ---------------- DATABASES
     db_mcq, db_tf = INS.parse_db('/home/user/uploads/بنك أسئلة مقرر قواعد البيانات  short.pdf')
@@ -410,7 +410,7 @@ def build_all():
                 db_secs.append({'id': '%s-%d' % (key, len(db_secs)), 'type': typ,
                                 'title': '%s — %s' % (sec.replace('&', 'و'), title), 'questions': g[key]})
     courses.append({'id': 'db', 'title': 'قواعد البيانات', 'emoji': '🗄️',
-                    'color': '#4338ca', 'sections': db_secs, 'raw': True})
+                    'color': '#2f6f4f', 'sections': db_secs, 'raw': True})
 
     for c in courses:
         if c.get('raw'):

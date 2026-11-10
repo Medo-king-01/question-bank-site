@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#4f46e5">
+<meta name="theme-color" content="#7c2a27">
 <title>بنك الأسئلة التفاعلي — ميد تيرم</title>
 <meta name="description" content="موقع تفاعلي لحل بنوك أسئلة الميد تيرم: 8 مقررات و709 أسئلة (اختيار من متعدد + صح/خطأ) مع تصحيح فوري وشرح، وضع تدريب ووضع امتحان، وحفظ أفضل نتيجة على جهازك.">
 <meta name="author" content="medo king">
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="بنك الأسئلة التفاعلي — ميد تيرم">
 <meta name="twitter:description" content="8 مقررات و709 أسئلة تفاعلياً مع تصحيح فوري وشرح — صُنع بواسطة medo king">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M18 40l7-16h5l7 16h-5l-1.4-3.6h-6.2L23 40h-5zm7.7-7.4h4.6L28 26.7l-2.3 5.9z' fill='%23fff'/%3E%3Cpath d='M39 25.5l3.4 3.4 6-6.4' fill='none' stroke='%233ddc97' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%237c2a27'/%3E%3Cpath d='M18 40l7-16h5l7 16h-5l-1.4-3.6h-6.2L23 40h-5zm7.7-7.4h4.6L28 26.7l-2.3 5.9z' fill='%23ecebeb'/%3E%3Cpath d='M39 25.5l3.4 3.4 6-6.4' fill='none' stroke='%23e97371' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="src/pwa/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="src/pwa/favicon-32.png">
@@ -25,17 +25,91 @@
 <meta name="apple-mobile-web-app-title" content="بنك الأسئلة">
 <style>
 :root{
-  --bg:#f4f6fb; --bg2:#eaeefb; --card:#ffffff; --ink:#101828; --ink-soft:#5b6478;
-  --line:#e3e8f2; --accent:#4f46e5; --accent-soft:#eef0ff;
-  --ok:#12a26b; --ok-soft:#e8f8f1; --bad:#e5484d; --bad-soft:#fdecec;
-  --shadow:0 10px 30px rgba(16,24,40,.08); --shadow-sm:0 2px 10px rgba(16,24,40,.06);
+  /* ---------- brand palette (the eight official colours) ----------
+     Reference only. Nothing should use these directly; use the semantic
+     tokens below so light and dark can diverge where they must. */
+  --color-1:#a29594;   /* warm grey    */
+  --color-2:#7c2a27;   /* deep maroon  */
+  --color-3:#dad4d2;   /* soft stone   */
+  --color-4:#1a1716;   /* near black, warm */
+  --color-5:#ecebeb;   /* off white    */
+  --color-6:#dedddd;   /* light grey   */
+  --color-7:#e52729;   /* signal red   */
+  --color-8:#e97371;   /* soft red     */
+
+  /* ---------- surfaces ---------- */
+  --bg:var(--color-5);            /* page canvas            */
+  --bg2:var(--color-6);           /* raised band / inputs   */
+  --card:var(--color-3);          /* cards and panels       */
+  --card-2:var(--color-6);        /* nested surface on a card */
+  --scrim:rgba(26,23,22,.55);     /* modal backdrop         */
+
+  /* ---------- text ---------- */
+  --ink:var(--color-4);           /* primary text   (14.98:1 on --bg) */
+  --ink-soft:#595756;             /* muted text — derived from --color-4
+                                     mixed into --bg so it clears 4.5:1
+                                     (--color-1 itself only reaches 2.4:1) */
+  --ink-on-accent:var(--color-5); /* text on a maroon fill  (7.96:1) */
+
+  /* ---------- lines ---------- */
+  --line:var(--color-1);          /* borders and dividers   */
+  --line-soft:#c9c1bf;            /* quiet separators inside cards */
+
+  /* ---------- interactive ---------- */
+  --accent:var(--color-2);        /* the one interactive colour (7.96:1) */
+  --accent-soft:#dfd4d3;          /* tint behind a selected item */
+  --accent-hover:#5f1f1d;         /* pressed / hover            */
+
+  /* ---------- states ----------
+     Red is the brand colour, so "error" cannot be plain red without
+     competing with every link. Each state also carries a glyph, so no
+     meaning rests on colour alone. */
+  --ok:#2f6f4f;   --ok-soft:#d6e4dc;   --ok-ink:var(--color-5);
+  --warn:#8a5a12; --warn-soft:#eee0cb;
+  --bad:#a3312e;  --bad-soft:#ecd7d6;  --bad-ink:var(--color-5);
+
+  /* ---------- effects ---------- */
+  --shadow:0 10px 30px rgba(26,23,22,.10);
+  --shadow-sm:0 2px 10px rgba(26,23,22,.07);
+  --urgent:var(--color-2);     /* text-safe red for the running-out-of-time badge */
+  --urgent-soft:#f0dcdb;
+  --focus:var(--color-7);       /* signal red: 3.79:1 on --bg, 3.08:1 on --card,
+                                   so the ring is always perceivable on the page */
+  --focus-offset:2px;
+
   --radius:20px; --topH:64px; --qbarH:0px;
 }
 [data-theme="dark"]{
-  --bg:#0b1020; --bg2:#0f1730; --card:#141c33; --ink:#eef2ff; --ink-soft:#9aa6c4;
-  --line:#243052; --accent:#7c8cff; --accent-soft:#1c2445;
-  --ok:#3ddc97; --ok-soft:#10281f; --bad:#ff6b6b; --bad-soft:#2a1518;
-  --shadow:0 12px 34px rgba(0,0,0,.45); --shadow-sm:0 2px 10px rgba(0,0,0,.3);
+  /* Not an inversion: the canvas is warm near-black from the palette, the
+     cards step *up* in lightness so they read as raised, and the interactive
+     colour switches to the soft red because the maroon would sit at 1.9:1
+     on this background. */
+  --bg:var(--color-4);
+  --bg2:#221e1d;
+  --card:#2c2625;
+  --card-2:#373030;
+  --scrim:rgba(0,0,0,.7);
+
+  --ink:var(--color-5);           /* 14.98:1 on --bg */
+  --ink-soft:#b1b0af;             /* 8.23:1 on --bg  */
+  --ink-on-accent:#1a1716;        /* dark text sits on the soft red (6.07:1) */
+
+  --line:#4a4240;                 /* visible against both card and canvas */
+  --line-soft:#3a3332;
+
+  --accent:var(--color-8);        /* 6.07:1 on --bg */
+  --accent-soft:#402322;          /* deep maroon wash, not a bright fill */
+  --accent-hover:var(--color-1);
+
+  --ok:#62c99a;   --ok-soft:#1e3329;   --ok-ink:var(--color-4);
+  --warn:#e0b062; --warn-soft:#332a1a;
+  --bad:#f08a86;  --bad-soft:#3a2222;  --bad-ink:var(--color-4);
+
+  --shadow:0 12px 34px rgba(0,0,0,.5); --shadow-sm:0 2px 10px rgba(0,0,0,.35);
+  --urgent:var(--color-8);     /* 5.84:1 on --urgent-soft */
+  --urgent-soft:#3a2222;
+  --focus:var(--color-8);       /* 6.07:1 on --bg, 5.07:1 on --card */
+  --focus-offset:2px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -62,7 +136,7 @@ button{font-family:inherit;touch-action:manipulation}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.2px}
 .brand .logo{
   width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:19px;
-  background:linear-gradient(135deg,#4f46e5,#8b5cf6);color:#fff;box-shadow:0 6px 16px rgba(79,70,229,.35)
+  background:var(--accent);color:var(--ink-on-accent);box-shadow:0 6px 16px rgba(124,42,39,.28)
 }
 .spacer{flex:1}
 .icon-btn{
@@ -165,7 +239,7 @@ button{font-family:inherit;touch-action:manipulation}
 .switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;font-weight:700;user-select:none}
 .switch input{display:none}
 .track{width:44px;height:25px;border-radius:999px;background:var(--line);position:relative;transition:.2s}
-.track:after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.track:after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:19px;height:19px;border-radius:50%;background:var(--color-5);transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 .switch input:checked + .track{background:var(--accent)}
 .switch input:checked + .track:after{inset-inline-start:22px}
 .exam-settings{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--bg2)}
@@ -175,12 +249,13 @@ button{font-family:inherit;touch-action:manipulation}
 .exam-setting input:disabled{opacity:.5}
 .q-source{display:block;margin-top:4px;font-size:11.5px;font-weight:700;color:var(--ink-soft)}
 .pill.timer{color:var(--accent);font-variant-numeric:tabular-nums;direction:ltr}
+.pill.timer.low{color:var(--urgent);background:var(--urgent-soft);border-color:var(--urgent)}
 .primary{
   border:none;border-radius:14px;padding:15px 26px;font-weight:800;font-size:16px;cursor:pointer;
-  background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;box-shadow:0 10px 24px rgba(79,70,229,.32);
+  background:var(--accent);color:var(--ink-on-accent);box-shadow:0 10px 24px rgba(26,23,22,.18);
   transition:.15s
 }
-.primary:hover{transform:translateY(-2px)}
+.primary:hover{background:var(--accent-hover);transform:translateY(-2px)}
 .primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
 
 /* ---------- quiz ---------- */
@@ -190,7 +265,7 @@ button{font-family:inherit;touch-action:manipulation}
 }
 .qbar .inner{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .progress{flex:1;height:9px;background:var(--line);border-radius:99px;overflow:hidden;min-width:120px}
-.progress i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),#22d3ee);transition:width .3s}
+.progress i{display:block;height:100%;width:0;border-radius:99px;background:var(--accent);transition:width .3s}
 .counters{display:flex;gap:8px;font-size:13px;font-weight:800}
 .pill{padding:5px 11px;border-radius:99px;background:var(--card);border:1px solid var(--line)}
 .pill.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,var(--line))}
@@ -208,19 +283,19 @@ button{font-family:inherit;touch-action:manipulation}
 }
 .qtext{font-size:16.5px;font-weight:700;line-height:1.75;flex:1}
 .qfig{margin:6px 0 14px;text-align:center}
-.qfig img{max-width:100%;max-height:330px;border-radius:12px;border:1px solid var(--line);background:#fff;padding:6px;cursor:zoom-in}
+.qfig img{max-width:100%;max-height:330px;border-radius:12px;border:1px solid var(--line);background:var(--color-5);padding:6px;cursor:zoom-in}
 .zoombar{display:block;font-size:11.5px;color:var(--ink-soft);font-weight:700;margin-top:4px}
-.lightbox{position:fixed;inset:0;z-index:80;background:rgba(8,12,26,.9);display:flex;align-items:center;
+.lightbox{position:fixed;inset:0;z-index:80;background:var(--scrim);display:flex;align-items:center;
   justify-content:center;padding:14px;cursor:zoom-out}
-.lightbox img{max-width:100%;max-height:92vh;border-radius:10px;background:#fff;padding:8px}
+.lightbox img{max-width:100%;max-height:92vh;border-radius:10px;background:var(--color-5);padding:8px}
 .lightbox .lb-x{position:absolute;top:calc(10px + env(safe-area-inset-top));inset-inline-end:14px;width:40px;height:40px;
-  border-radius:50%;border:none;background:#fff;color:#111;font-size:20px;font-weight:800;cursor:pointer}
+  border-radius:50%;border:none;background:var(--color-5);color:var(--color-4);font-size:20px;font-weight:800;cursor:pointer}
 .opts{display:flex;flex-direction:column;gap:9px}
 /* ---------- accessibility: visible focus + motion ---------- */
 :where(a,button,input,select,label).focus-visible{
-  outline:3px solid var(--accent);outline-offset:2px;border-radius:10px
+  outline:3px solid var(--focus);outline-offset:var(--focus-offset);border-radius:10px
 }
-.opt:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.opt:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
 .sr-only{
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
   clip:rect(0 0 0 0);white-space:nowrap;border:0
@@ -242,9 +317,9 @@ button{font-family:inherit;touch-action:manipulation}
 }
 .opt.sel{border-color:var(--accent);background:var(--accent-soft)}
 .opt.correct{border-color:var(--ok);background:var(--ok-soft)}
-.opt.correct .k{background:var(--ok);color:#fff;border-color:transparent}
+.opt.correct .k{background:var(--ok);color:var(--ok-ink);border-color:transparent}
 .opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
-.opt.wrong .k{background:var(--bad);color:#fff;border-color:transparent}
+.opt.wrong .k{background:var(--bad);color:var(--bad-ink);border-color:transparent}
 .opt.locked{cursor:default}
 .opt .mark{font-weight:900;text-align:center;font-size:15px}
 .feedback{
@@ -293,25 +368,25 @@ button{font-family:inherit;touch-action:manipulation}
 .pwa-toast{
   position:fixed;left:50%;bottom:18px;transform:translate(-50%,140%);z-index:90;
   display:flex;align-items:center;gap:12px;max-width:min(560px,calc(100vw - 28px));
-  background:#16203a;color:#fff;border:1px solid rgba(255,255,255,.12);
+  background:#1a1716;color:#ecebeb;border:1px solid color-mix(in srgb,#ecebeb 16%,transparent);
   border-radius:14px;padding:13px 16px;
   box-shadow:0 12px 34px rgba(16,24,40,.28);transition:transform .28s ease;
   font-size:13.5px;font-weight:700;line-height:1.5
 }
 [data-theme="dark"] .pwa-toast{
-  background:#eef2ff;color:#101a33;border-color:rgba(16,26,51,.12);
-  box-shadow:0 12px 24px rgba(0,0,0,.55)
+  background:#ecebeb;color:#1a1716;border-color:color-mix(in srgb,#1a1716 14%,transparent);
+  box-shadow:var(--shadow)
 }
 .pwa-toast.show{transform:translate(-50%,0)}
 .pwa-msg{flex:1;min-width:0;overflow-wrap:anywhere}
 .pwa-act{
-  border:0;background:var(--accent);color:#fff;font-family:inherit;font-weight:800;font-size:13px;
+  border:0;background:var(--accent);color:var(--ink-on-accent);font-family:inherit;font-weight:800;font-size:13px;
   padding:9px 15px;border-radius:10px;cursor:pointer;white-space:nowrap;flex-shrink:0
 }
 .pwa-act:hover{filter:brightness(1.1)}
-/* The dark-mode accent (#7c8cff) only reaches 3:1 against white text, so the
-   button gets an explicit dark label instead. */
-[data-theme="dark"] .pwa-act{background:#4f46e5;color:#fff}
+/* In dark mode the interactive colour is a light red, so the label flips to
+   dark ink instead of near-white. */
+[data-theme="dark"] .pwa-act{background:#e97371;color:#1a1716}
 @media (prefers-reduced-motion: reduce){ .pwa-toast{transition:none} }
 .qsearch{position:relative;display:flex;align-items:center;gap:9px;border:1.5px solid var(--line);
   background:var(--card);border-radius:13px;padding:0 13px;transition:.15s}
@@ -345,7 +420,7 @@ button{font-family:inherit;touch-action:manipulation}
 .srch-empty{border:1px dashed var(--line);border-radius:13px;padding:16px;text-align:center;margin-top:12px}
 .srch-empty b{display:block;font-size:14px;margin-bottom:5px}
 .srch-empty span{font-size:12.5px;color:var(--ink-soft);line-height:1.6}
-.lv-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.lv-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
 .lv-head{font-size:12.5px;color:var(--ink-soft);font-weight:800;margin-bottom:10px}
 .lv-row{display:grid;grid-template-columns:70px 1fr 34px;align-items:center;gap:9px;margin-bottom:7px}
 .lv-lbl{font-size:11.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -394,17 +469,16 @@ button{font-family:inherit;touch-action:manipulation}
 .tabs{display:flex;gap:8px;margin:0 0 18px;flex-wrap:wrap}
 .tabs button{border:1.5px solid var(--line);background:var(--card);border-radius:99px;padding:9px 16px;
   font-size:13.5px;font-weight:800;cursor:pointer;color:var(--ink);font-family:inherit;transition:.12s}
-.tabs button.sel{background:var(--accent);color:#fff;border-color:var(--accent)}
-/* The dark-mode accent (#7c8cff) only reaches 3:1 with white text; darken the
-   selected tab so its label stays readable. */
-[data-theme="dark"] .tabs button.sel{background:#4f46e5;color:#fff;border-color:#6d63ff}
+.tabs button.sel{background:var(--accent);color:var(--ink-on-accent);border-color:var(--accent)}
+/* Same for the selected tab: dark label on the light red fill. */
+[data-theme="dark"] .tabs button.sel{background:var(--accent);color:var(--ink-on-accent);border-color:var(--accent)}
 @media (max-width:520px){
   .an-card{padding:13px} .an-card b{font-size:22px}
   .an-days{height:80px;gap:3px} .an-day .d{font-size:9px}
 }
 .review{margin-top:8px}
 .review h3{font-size:16px;margin:20px 0 12px}
-.rev-item{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;background:var(--card)}
+.rev-item{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;background:var(--card-2)}
 .rev-q{font-weight:700;font-size:14.5px;line-height:1.7;margin-bottom:9px}
 .rev-line{font-size:13.5px;margin-top:5px;display:flex;gap:7px;align-items:flex-start}
 .rev-line b{font-weight:800;flex:0 0 auto}
@@ -428,18 +502,17 @@ button{font-family:inherit;touch-action:manipulation}
 .maker .mk-by{font-size:11.5px;font-weight:700;color:var(--ink-soft);letter-spacing:.4px}
 .maker .mk-name{
   font-size:16px;font-weight:900;letter-spacing:.3px;
-  background:linear-gradient(135deg,var(--accent),#8b5cf6);
-  -webkit-background-clip:text;background-clip:text;color:transparent;white-space:nowrap
+  color:var(--accent);white-space:nowrap
 }
 .maker .mk-div{width:1px;height:30px;background:var(--line)}
 .wa-btn{
   display:inline-flex;align-items:center;gap:9px;text-decoration:none;
-  background:linear-gradient(135deg,#25d366,#12b352);color:#fff;
+  background:#128c7e;color:#fff;
   border-radius:12px;padding:9px 15px;font-weight:800;font-size:13.5px;
-  box-shadow:0 6px 16px rgba(18,179,82,.28);transition:.15s;white-space:nowrap;
+  box-shadow:0 6px 16px rgba(18,140,126,.28);transition:.15s;white-space:nowrap;
   direction:ltr
 }
-.wa-btn:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(18,179,82,.38);color:#fff}
+.wa-btn:hover{transform:translateY(-2px);box-shadow:0 9px 22px rgba(18,140,126,.38);color:#fff}
 .wa-btn svg{flex:0 0 auto}
 .wa-btn .num{font-variant-numeric:tabular-nums;letter-spacing:.2px}
 
@@ -952,7 +1025,7 @@ function masteryBars(m){
   const labels = ['مبتدئ', 'يتحسن', 'جيد', 'متقن جزئيًا', 'متقن', 'مستقر'];
   const max = Math.max(1, ...m.byLevel);
   const rows = m.byLevel.map((n, i) => {
-    const cls = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? '#f59e0b' : 'var(--accent)';
+    const cls = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? 'var(--warn)' : 'var(--accent)';
     return `<div class="lv-row">
       <span class="lv-lbl">${labels[i]}</span>
       <div class="lv-track"><i style="width:${Math.round(n/max*100)}%;background:${cls}"></i></div>
@@ -1235,7 +1308,7 @@ function startExamTimer(){
   if(state.view!=='quiz'||state.mode!=='exam'||!state.deadline)return;
   const tick=()=>{
     const left=Math.max(0,state.deadline-Date.now()),pill=$('#timerPill');
-    if(pill)pill.textContent=formatRemaining(left);
+    if(pill){pill.textContent=formatRemaining(left);pill.classList.toggle('low',left<=60000);}
     if(left<=0){stopExamTimer();finish(true);}
   };
   tick();
@@ -1746,7 +1819,7 @@ function analyticsOverview(st){
       <div class="an-bar"><span class="lbl">خاطئة</span><span class="val">${st.wrong}</span>
         <div class="track"><i style="width:${Math.round(st.wrong/st.total*100)}%;background:var(--bad)"></i></div></div>
       <div class="an-bar"><span class="lbl">تم إظهار الإجابة</span><span class="val">${st.revealed}</span>
-        <div class="track"><i style="width:${Math.round(st.revealed/st.total*100)}%;background:#f59e0b"></i></div></div>
+        <div class="track"><i style="width:${Math.round(st.revealed/st.total*100)}%;background:var(--warn)"></i></div></div>
     </div>
 
     ${unansweredCountPanel()}
@@ -1773,7 +1846,7 @@ function analyticsCourses(st){
   if (!rows.length) return '<div class="an-panel"><div class="an-empty">لا توجد محاولات في أي مقرر بعد.</div></div>';
 
   const bars = rows.map(r => {
-    const color = r.accuracy >= 70 ? 'var(--ok)' : r.accuracy >= 50 ? '#f59e0b' : 'var(--bad)';
+    const color = r.accuracy >= 70 ? 'var(--ok)' : r.accuracy >= 50 ? 'var(--warn)' : 'var(--bad)';
     return `<div class="an-bar">
       <span class="lbl">${esc(r.course.title)}</span>
       <span class="val">${r.correct}/${r.total} · ${r.accuracy}%</span>
@@ -1792,7 +1865,7 @@ function analyticsCourses(st){
   const secRows = sections.map(sec => `<div class="an-bar">
       <span class="lbl">${esc(sec.title)}</span>
       <span class="val">${sec.correct}/${sec.total} · ${sec.accuracy}%</span>
-      <div class="track"><i style="width:${sec.accuracy}%;background:${sec.accuracy>=70?'var(--ok)':sec.accuracy>=50?'#f59e0b':'var(--bad)'}"></i></div>
+      <div class="track"><i style="width:${sec.accuracy}%;background:${sec.accuracy>=70?'var(--ok)':sec.accuracy>=50?'var(--warn)':'var(--bad)'}"></i></div>
     </div>`).join('');
 
   return `
@@ -1810,7 +1883,7 @@ function masteryPanel(){
   const labels = ['مبتدئ', 'يتحسن', 'جيد', 'متقن جزئيًا', 'متقن', 'مستقر'];
   const max = Math.max(1, ...sum.byLevel);
   const rows = sum.byLevel.map((n, i) => {
-    const colour = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? '#f59e0b' : 'var(--accent)';
+    const colour = i >= MASTERY_MASTERED ? 'var(--ok)' : i === 0 ? 'var(--bad)' : i <= 2 ? 'var(--warn)' : 'var(--accent)';
     return `<div class="lv-row">
       <span class="lv-lbl">${labels[i]}</span>
       <div class="lv-track"><i style="width:${Math.round(n/max*100)}%;background:${colour}"></i></div>
@@ -1901,7 +1974,7 @@ function analyticsSessions(st){
     const date = when.toLocaleDateString('ar-EG', {day:'numeric', month:'short'});
     const time = when.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
     const pct = s2.pct !== undefined ? s2.pct : (s2.total ? Math.round(s2.correct / s2.total * 100) : 0);
-    const color = pct >= 70 ? 'var(--ok)' : pct >= 50 ? '#f59e0b' : 'var(--bad)';
+    const color = pct >= 70 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--bad)';
     const badge = s2.finished ? '' : ' · لم تُكمل';
     return `<div class="sess">
       <div class="t"><b>${esc(s2.courseTitle || '—')}${s2.isReview ? ' (مراجعة)' : ''}</b>
@@ -2100,7 +2173,7 @@ function renderResult(){
   const {ok,bad} = scoreNow();
   const total = state.quiz.length;
   const pct = total? Math.round(ok/total*100) : 0;
-  const color = pct>=80 ? 'var(--ok)' : pct>=50 ? '#f59e0b' : 'var(--bad)';
+  const color = pct>=80 ? 'var(--ok)' : pct>=50 ? 'var(--warn)' : 'var(--bad)';
   const msg = pct>=90 ? 'ممتاز جدًا! جاهز للميد تيرم 🎉' : pct>=75 ? 'نتيجة قوية، كمّل مراجعة الأخطاء 💪' : pct>=50 ? 'أساس جيد — راجع الأسئلة التي أخطأت فيها.' : 'محاولة أولى، ركّز على المراجعة ثم أعد المحاولة.';
   const wrong = state.quiz.map((q,i)=>({q,i,a:state.answers[i]}))
     .filter(x=>x.a===undefined||x.a===-1||x.a!==x.q.ans);
