@@ -147,7 +147,7 @@ python3 scripts/extract/audit.py         # فحص البيانات: لازم ي�
 python3 scripts/extract/audit.py --strict # نفس الفحص + التحذيرات كأخطاء
 
 npm install --no-save jsdom              # مرة واحدة (أداة اختبار فقط)
-node tests/run.mjs                       # 171 اختبارًا سلوكيًا — لازم PASS
+node tests/run.mjs                       # 173 اختبارًا سلوكيًا — لازم PASS
 ```
 
 > **متطلب الاختبارات:** Node **22.22.2 أو أحدث** — `jsdom 31` يعتمد على واجهة `zstd` المضافة في Node 22.7. الموقع نفسه لا يحتاج Node إطلاقًا؛ القيد على أداة الاختبار فقط، والمشغّل يعطي رسالة واضحة لو الإصدار أقدم.

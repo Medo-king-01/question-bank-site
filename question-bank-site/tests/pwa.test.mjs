@@ -247,7 +247,7 @@ function bootWorker() {
   const listeners = {};
   const cacheStore = new Map();
   const deleted = [];
-  const state = { skipped: false, claimed: false, putDelay: 15, failPut: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
+  const state = { skipped: false, claimed: false, putDelay: 15, matchDelay: 5, failPut: false, terminated: false, fetchImpl: async (req) => ({ ok: true, status: 200, url: req.url, clone() { return this; } }) };
   /* makeResponse(type, status) builds a response with a Content-Type header */
   const makeResponse = (type, status = 200) => ({
     ok: status < 400, status, url: '',
@@ -271,12 +271,20 @@ function bootWorker() {
       async put(req, res) {
         const key = typeof req === 'string' ? req : req.url;
         if (state.failPut) throw new Error('QuotaExceededError');
+        if (state.terminated) return;            // the worker is already gone
         if (state.putDelay <= 0) { m.set(key, res); return; }
         await new Promise((r) => setTimeout(r, state.putDelay));
+        if (state.terminated) return;
         m.set(key, res);
       },
       async putThrows() { throw new Error('QuotaExceededError'); },
-      async match(req) { return m.get(typeof req === 'string' ? req : req.url); },
+      async match(req) {
+        /* The real Cache API resolves in a later task; an instant match() lets
+           the response settle before the network continuation runs and hides
+           every late-registration bug. */
+        if (state.matchDelay > 0) await new Promise((r) => setTimeout(r, state.matchDelay));
+        return m.get(typeof req === 'string' ? req : req.url);
+      },
       /* the SAME map the methods above write to, so tests can inspect it */
       get _map() { return m; },
     };
@@ -311,9 +319,43 @@ function bootWorker() {
   vm.createContext(ctx);
   new vm.Script(sw, { filename: 'sw.js' }).runInContext(ctx);
 
+  /* Event lifetime, modelled on the spec.
+   *
+   * waitUntil() is legal only while the event is dispatched or extended. Once
+   * the respondWith() promise settles and every registered promise has
+   * settled, the event is over: a later waitUntil() throws InvalidStateError
+   * and the worker may be terminated mid-task. That is exactly what separates
+   * a synchronously registered cache refresh (correct) from one registered
+   * inside a fetch().then() callback (silently broken in production). */
   const fire = (type, extra = {}) => {
     const waits = [];
-    const e = { ...extra, waitUntil: (p) => waits.push(p), respondWith: (p) => { e.__res = p; } };
+    const done = new Set();
+    let closed = false;
+    let responseSettled = false;
+    state.terminated = false;
+
+    const settle = () => {
+      /* The browser closes the event a task after the response settles. */
+      setTimeout(() => {
+        if (closed || !responseSettled) return;
+        if (waits.some((w) => !done.has(w))) return;
+        closed = true;
+        state.terminated = true;
+      }, 0);
+    };
+
+    const e = {
+      ...extra,
+      waitUntil(p) {
+        if (closed) throw new Error('InvalidStateError: waitUntil() after the event finished');
+        waits.push(p);
+        Promise.resolve(p).catch(() => {}).then(() => { done.add(p); settle(); });
+      },
+      respondWith(p) {
+        e.__res = p;
+        Promise.resolve(p).catch(() => {}).then(() => { responseSettled = true; settle(); });
+      },
+    };
     (listeners[type] || []).forEach((fn) => fn(e));
     return { e, waits };
   };
@@ -586,6 +628,59 @@ group('PWA·runtime', () => {
        surface as a failed fetch event. */
     await Promise.all(fired.waits);
     assert(true, 'waitUntil work settled without throwing');
+  });
+
+  test('a cached asset is still refreshed after the response has gone out', async () => {
+    /* The bug: with a cache hit the response resolves almost immediately and
+     * the fetch event ends. A waitUntil() registered from fetch().then() then
+     * arrives too late, throws InvalidStateError, and the cached copy is never
+     * refreshed. Silent — and it affects every already-cached asset, i.e.
+     * almost all of them on a second visit. */
+    const w = bootWorker();
+    await Promise.all(w.fire('install').waits);
+
+    const url = 'https://example.com/src/pwa/icon-192.png';
+    const req = { method: 'GET', mode: 'cors', destination: 'image', url };
+
+    /* First visit: cache miss, network answers V1. */
+    w.state.fetchImpl = async () => { const r = w.makeResponse('image/png', 200); r.body = 'V1'; return r; };
+    await w.fire('fetch', { request: req }).e.__res;
+    await new Promise((r) => setTimeout(r, 40));
+    assert([...w.cacheStore.values()].some((m) => m.has(url)), 'V1 must be cached after the first visit');
+
+    /* Second visit: cache HIT, so the response is instant. The network answers
+     * well after the response has gone out. */
+    w.state.putDelay = 0;
+    w.state.fetchImpl = () => new Promise((resolve) => {
+      setTimeout(() => {
+        const r = w.makeResponse('image/png', 200);
+        r.body = 'V2';
+        resolve(r);
+      }, 25);
+    });
+
+    const fired = w.fire('fetch', { request: req });
+    const res = await fired.e.__res;
+    eq(res.body, 'V1', 'a cache hit must return the stored copy immediately');
+
+    await new Promise((r) => setTimeout(r, 100));
+    const stored = [...w.cacheStore.values()].find((m) => m.has(url)).get(url);
+    eq(stored.body, 'V2',
+      'the cached copy must be refreshed even though the response had already gone out');
+  });
+
+  test('the refresh is registered while the event is still alive', () => {
+    /* Structural counterpart: waitUntil() must be a statement of the listener,
+     * not something reached through an await or a promise callback. */
+    const block = sw.slice(sw.indexOf('// --- same-origin assets'), sw.indexOf('/* The page can ask'));
+    const waitAt = block.indexOf('event.waitUntil(');
+    const respondAt = block.indexOf('event.respondWith(');
+    assert(waitAt > -1, 'waitUntil must be used for the asset refresh');
+    assert(waitAt < respondAt,
+      'waitUntil() must precede respondWith(): a cache hit closes the event first');
+    const waitLine = block.split('\n').find((l) => l.includes('event.waitUntil('));
+    eq(waitLine.match(/^ */)[0].length, 2,
+      'waitUntil() must sit at listener level (2 spaces), not inside a callback');
   });
 
   test('POST and cross-origin requests are never intercepted', () => {

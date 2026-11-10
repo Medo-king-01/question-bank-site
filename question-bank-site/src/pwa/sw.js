@@ -158,23 +158,41 @@ self.addEventListener('fetch', (event) => {
   }
 
   // --- same-origin assets: stale-while-revalidate --------------------------
+  //
+  // Timing matters more here than anywhere else in this file.
+  //
+  // When the asset is already cached the response is handed back immediately
+  // and the fetch event is finished long before the network answers. Calling
+  // waitUntil() from inside fetch().then() — which is what an earlier version
+  // of this file did — therefore throws InvalidStateError, the throw is
+  // swallowed by the surrounding .catch(), and the cached copy is never
+  // refreshed. Silent, and impossible to notice by reading the code.
+  //
+  // So the lifetime promise is registered synchronously, before any await, and
+  // carries the condition itself. The fetch starts here too, so that even a
+  // late waitUntil() would not be the only thing keeping the worker alive.
+  const network = fetch(req);        // started before anything is awaited
+
+  const refreshing = network.then((res) => {
+    if (res && res.ok && cacheable(req, res)) {
+      return caches.open(CACHE_NAME)
+        .then((cache) => cache.put(req, res.clone()))
+        .catch(() => {});            // quota or a failed put: not fatal
+    }
+    return undefined;
+  }).catch(() => {});                // network down: nothing to refresh
+
+  event.waitUntil(refreshing);
+
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
     const cached = await cache.match(req);
-    const network = fetch(req).then((res) => {
-      /* If the asset is already cached the response below does not wait on the
-         network at all, so response-time waiting is no good here. The write is
-         instead attached to the event lifetime with waitUntil(): the browser
-         keeps this worker alive until the put settles. Without it the worker
-         can be killed mid-write and the asset never refreshes. */
-      if (res && res.ok && cacheable(req, res)) {
-        event.waitUntil(
-          cache.put(req, res.clone()).catch(() => {}),   // quota: not fatal
-        );
-      }
-      return res;
-    }).catch(() => null);
-    return cached || (await network) || new Response('', { status: 504 });
+    if (cached) return cached;       // instant; the refresh above is already queued
+    try {
+      return await network;          // cache miss: the user needs the real thing
+    } catch (e) {
+      return new Response('', { status: 504 });
+    }
   })());
 });
 
