@@ -148,44 +148,202 @@ button{font-family:inherit;touch-action:manipulation}
 .icon-btn.ghost{background:transparent;box-shadow:none}
 
 /* ---------- hero ---------- */
-.hero{padding:38px 0 10px;text-align:center}
-.hero h1{font-size:clamp(24px,4.4vw,38px);margin:0 0 10px;letter-spacing:-.5px;line-height:1.3}
-.hero p{margin:0 auto;max-width:640px;color:var(--ink-soft);font-size:16px;line-height:1.7}
+/* ================================================================== *
+ * HOME DASHBOARD
+ *
+ * Reading order is the decision: what to do next (welcome), then the one
+ * thing that was interrupted (resume), then where you stand (progress),
+ * then what needs attention (review), then the catalogue.
+ * ================================================================== */
 
-/* ---------- homepage developer intro ---------- */
-.hero-intro{
-  display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,310px);
-  align-items:center;gap:clamp(22px,5vw,58px);text-align:right;
-  padding:28px 0 24px;min-height:300px
+/* ---------- 1. welcome ---------- */
+.hm-welcome{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,200px);
+  align-items:center;gap:clamp(18px,4vw,44px);
+  padding:clamp(22px,4vw,34px) 0 clamp(18px,3vw,26px);text-align:right
 }
-.hero-intro .hero-copy{min-width:0}
-.hero-intro h1{font-size:clamp(27px,4.2vw,40px);margin:0 0 12px;letter-spacing:-.5px;line-height:1.35}
-.hero-intro p{margin:0;max-width:650px;color:var(--ink-soft);font-size:16px;line-height:1.8}
-.hero-intro .chips{justify-content:flex-start;margin-top:18px}
-.hero-portrait{
-  display:flex;align-items:flex-end;justify-content:center;align-self:stretch;
-  min-height:260px;overflow:visible
+.hm-eyebrow{
+  margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--ink-soft)
 }
-.hero-portrait picture{display:block;width:100%;height:100%}
-.hero-portrait img{
-  display:block;width:100%;height:clamp(260px,31vw,360px);max-height:360px;
+.hm-title{
+  margin:0 0 10px;font-size:clamp(26px,4.6vw,38px);line-height:1.2;
+  letter-spacing:-.6px;font-weight:900
+}
+.hm-lede{
+  margin:0;max-width:52ch;color:var(--ink-soft);
+  font-size:clamp(14.5px,1.6vw,16px);line-height:1.75
+}
+.hm-facts{display:flex;flex-wrap:wrap;gap:clamp(14px,3vw,30px);margin-top:clamp(16px,2.5vw,22px)}
+.hm-fact{display:flex;flex-direction:column;gap:1px}
+.hm-fact b{
+  font-size:clamp(20px,2.6vw,25px);font-weight:900;line-height:1.15;
+  color:var(--accent);font-variant-numeric:tabular-nums
+}
+.hm-fact span{font-size:12px;font-weight:700;color:var(--ink-soft)}
+.hm-portrait{
+  display:flex;align-items:flex-end;justify-content:center;align-self:end;
+  min-height:0;overflow:visible
+}
+.hm-portrait picture{display:block;width:100%}
+.hm-portrait img{
+  display:block;width:100%;height:clamp(150px,17vw,200px);
   object-fit:contain;object-position:center bottom
 }
-@media(max-width:680px){
-  .hero-intro{grid-template-columns:1fr;gap:4px;text-align:center;padding:16px 0 20px}
-  .hero-intro .hero-copy{order:2}
-  .hero-intro .hero-portrait{order:1;min-height:0;height:270px;overflow:visible}
-  .hero-intro .hero-portrait img{height:260px;max-height:260px}
-  .hero-intro .hero-copy p{margin-inline:auto;font-size:14.5px}
-  .hero-intro .chips{justify-content:center}
+
+/* ---------- 2. resume ---------- */
+.hm-resume{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:clamp(12px,2vw,18px);
+  background:var(--accent-soft);border:1px solid var(--accent);
+  border-radius:var(--radius);padding:clamp(14px,2vw,18px) clamp(16px,2.5vw,22px);
+  margin-bottom:clamp(18px,3vw,26px)
 }
-.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:18px}
-.chip{
-  background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 15px;
-  font-size:13.5px;font-weight:700;color:var(--ink-soft);box-shadow:var(--shadow-sm)
+.hm-resume-ic{
+  display:grid;place-items:center;width:38px;height:38px;flex:none;
+  border-radius:12px;background:var(--accent);color:var(--ink-on-accent)
 }
+.hm-resume-body{min-width:0}
+.hm-resume-kicker{
+  margin:0 0 2px;font-size:11.5px;font-weight:800;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--accent);opacity:.85
+}
+.hm-resume-title{
+  display:block;font-size:clamp(15px,1.9vw,16.5px);font-weight:900;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.hm-resume-meta{margin:3px 0 0;font-size:13px;color:var(--ink-soft);font-weight:600}
+.hm-resume-bar{
+  height:5px;border-radius:99px;background:var(--bg);margin-top:9px;
+  overflow:hidden;max-width:340px
+}
+.hm-resume-bar i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .3s}
+.hm-resume-acts{display:flex;gap:8px;flex:none}
+.hm-resume-acts .primary{padding:11px 20px;font-size:14px;border-radius:12px}
+.hm-resume-acts .ghost-btn{padding:11px 16px;font-size:13.5px}
+
+/* ---------- 3. progress ---------- */
+.hm-progress{
+  position:relative;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:1px;background:var(--line);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;margin-bottom:clamp(18px,3vw,26px)
+}
+.hm-stat{
+  display:flex;flex-direction:column;gap:2px;
+  background:var(--card);padding:clamp(14px,2vw,18px) clamp(14px,2vw,20px)
+}
+.hm-stat-n{
+  font-size:clamp(21px,2.8vw,27px);font-weight:900;line-height:1.15;
+  letter-spacing:-.5px;font-variant-numeric:tabular-nums;color:var(--ink)
+}
+.hm-stat-k{font-size:12.5px;font-weight:800;color:var(--ink)}
+.hm-stat-sub{font-size:11.5px;font-weight:600;color:var(--ink-soft);line-height:1.5}
+.hm-streak{
+  position:absolute;inset-inline-end:clamp(14px,2vw,20px);top:clamp(12px,2vw,16px);
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11.5px;font-weight:800;color:var(--urgent);
+  background:var(--urgent-soft);border:1px solid currentColor;
+  border-radius:99px;padding:3px 10px 3px 8px
+}
+.hm-streak svg{width:13px;height:13px}
+.hm-streak b{font-size:12.5px}
+.hm-streak span{font-weight:700;opacity:.85}
+
+/* ---------- 4. smart review ---------- */
+.hm-review{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:clamp(16px,2.4vw,22px);margin-bottom:clamp(20px,3.4vw,30px)
+}
+.hm-review.is-due{border-color:var(--accent)}
+.hm-review-head{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:clamp(12px,2vw,16px)
+}
+.hm-review-ic{
+  display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:13px;
+  background:var(--accent-soft);color:var(--accent)
+}
+.hm-review.is-due .hm-review-ic{background:var(--accent);color:var(--ink-on-accent)}
+.hm-review-copy{min-width:0}
+.hm-review-title{display:block;font-size:16px;font-weight:900;line-height:1.4}
+.hm-review-sub{margin:3px 0 0;font-size:13.5px;line-height:1.65;color:var(--ink-soft)}
+.hm-due-n{color:var(--accent);font-size:15px;font-weight:900}
+.hm-review-btn{padding:12px 22px;font-size:14px;border-radius:12px;flex:none}
+
+/* ---------- 5. courses ---------- */
+.hm-section-head{margin:0 0 14px}
+.hm-h2{
+  margin:0;font-size:clamp(18px,2.4vw,21px);font-weight:900;letter-spacing:-.3px;
+  display:flex;align-items:center;gap:10px
+}
+.hm-h2:after{content:"";flex:1;height:1px;background:var(--line-soft)}
+.hm-h2-sub{margin:5px 0 0;font-size:12.5px;color:var(--ink-soft);font-weight:600}
 
 /* ---------- cards ---------- */
+/* ---------- home: tablet ---------- */
+@media(max-width:820px){
+  /* The resume strip stops being a 3-column row: the buttons move under the
+     text so the course title never gets squeezed to an ellipsis. */
+  .hm-resume{grid-template-columns:auto minmax(0,1fr);row-gap:12px}
+  .hm-resume-acts{grid-column:1/-1;justify-content:flex-end}
+  /* Review: the button spans the full width beneath the copy. */
+  .hm-review-head{grid-template-columns:auto minmax(0,1fr)}
+  .hm-review-btn{grid-column:1/-1;width:100%;justify-content:center}
+  .hm-stat{padding:14px 16px}
+}
+
+/* ---------- home: small phone ---------- */
+@media(max-width:620px){
+  /* Welcome stacks; the portrait becomes a small avatar beside the greeting
+     instead of a banner above it, which would push the resume card off-screen. */
+  .hm-welcome{
+    grid-template-columns:auto minmax(0,1fr);align-items:center;
+    gap:14px;padding:16px 0 18px
+  }
+  .hm-portrait{order:-1;align-self:center;width:58px}
+  .hm-portrait img{height:74px}
+  .hm-eyebrow{font-size:11px;margin-bottom:3px}
+  .hm-title{font-size:24px;margin:0 0 6px}
+  .hm-lede{font-size:13.5px;line-height:1.65}
+  .hm-facts{gap:16px;margin-top:12px}
+  .hm-fact b{font-size:19px}
+  .hm-fact span{font-size:11px}
+
+  /* Progress becomes a 2x2 grid so the numbers stay legible rather than
+     shrinking into four skinny columns. */
+  .hm-progress{grid-template-columns:1fr 1fr}
+  .hm-streak{position:static;grid-column:1/-1;justify-self:start;margin:12px 14px}
+  .hm-stat-n{font-size:22px}
+
+  .hm-review{padding:14px}
+  .hm-review-ic{width:34px;height:34px;border-radius:11px}
+  .hm-review-title{font-size:15px}
+  .hm-review-sub{font-size:12.5px}
+  .hm-review-btn{padding:11px 16px;font-size:13.5px}
+
+  .hm-resume{padding:13px 14px;border-radius:16px}
+  .hm-resume-acts .primary{flex:1}
+  .hm-resume-bar{max-width:none}
+
+  .grid{grid-template-columns:1fr;gap:12px;margin:20px 0 40px}
+  .course-card{padding:16px}
+  .cc-title{font-size:16px}
+  .cc-emoji{width:40px;height:40px;border-radius:12px;font-size:20px}
+}
+
+/* ---------- home: very small phone ---------- */
+@media(max-width:380px){
+  .hm-welcome{grid-template-columns:1fr}
+  .hm-portrait{display:none}
+  .hm-facts{gap:12px}
+  .hm-stat{padding:12px}
+  .hm-stat-k{font-size:11.5px}
+  .hm-stat-sub{font-size:10.5px}
+  .hm-resume-acts{flex-direction:column}
+  .hm-resume-acts .primary,.hm-resume-acts .ghost-btn{width:100%}
+}
+
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin:26px 0 50px}
 .course-card{
   position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
@@ -204,10 +362,16 @@ button{font-family:inherit;touch-action:manipulation}
 .cc-meta{color:var(--ink-soft);font-size:13px;margin-top:4px;font-weight:600;display:flex;flex-wrap:wrap;gap:0 6px;align-items:center}
 .cc-meta .ccm{white-space:nowrap}
 .cc-meta .ccm.sep{opacity:.45}
-.cc-foot{display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:10px}
+.cc-acc{
+  height:4px;border-radius:99px;background:var(--bg2);overflow:hidden;margin:12px 0 0
+}
+.cc-acc i{display:block;height:100%;border-radius:99px;background:var(--c,var(--accent));transition:width .3s}
+.cc-foot{display:flex;align-items:center;justify-content:space-between;margin-top:14px;gap:10px;flex-wrap:wrap}
+.cc-stats{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.cc-acc-t{font-size:11.5px;font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 .badge{
-  font-size:12.5px;font-weight:800;padding:6px 11px;border-radius:999px;
-  background:var(--accent-soft);color:var(--accent)
+  font-size:12px;font-weight:800;padding:5px 10px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent);white-space:nowrap
 }
 .badge.ok{background:var(--ok-soft);color:var(--ok)}
 .go{
@@ -421,7 +585,19 @@ button{font-family:inherit;touch-action:manipulation}
 .srch-empty b{display:block;font-size:14px;margin-bottom:5px}
 .srch-empty span{font-size:12.5px;color:var(--ink-soft);line-height:1.6}
 .lv-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line-soft)}
-.lv-head{font-size:12.5px;color:var(--ink-soft);font-weight:800;margin-bottom:10px}
+.lv-head{
+  font-size:12.5px;color:var(--ink-soft);font-weight:800;margin:0;
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:7px;
+  padding:2px 0;border-radius:8px
+}
+.lv-head::-webkit-details-marker{display:none}
+.lv-head:before{
+  content:"▾";font-size:11px;line-height:1;transition:transform .15s;flex:none
+}
+.lv-wrap:not([open]) .lv-head:before{transform:rotate(-90deg)}
+.lv-head:hover{color:var(--ink)}
+.lv-head:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.lv-body{padding-top:11px}
 .lv-row{display:grid;grid-template-columns:70px 1fr 34px;align-items:center;gap:9px;margin-bottom:7px}
 .lv-lbl{font-size:11.5px;font-weight:700;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lv-track{height:7px;border-radius:99px;background:var(--bg2);overflow:hidden}
@@ -530,11 +706,6 @@ button{font-family:inherit;touch-action:manipulation}
   .brand span{display:none}
   .top .inner{height:54px;gap:8px}
   .icon-btn{height:40px;min-width:40px;padding:0 11px;font-size:13.5px;border-radius:11px}
-  .hero{padding:20px 0 6px}
-  .hero h1{font-size:26px;line-height:1.35}
-  .hero p{font-size:14.5px;line-height:1.75}
-  .chips{gap:8px;margin-top:14px}
-  .chip{padding:7px 12px;font-size:12.5px}
   .course-card{padding:15px 16px}
   .cc-emoji{width:40px;height:40px;border-radius:12px}
   .cc-title{font-size:16px}
@@ -618,7 +789,6 @@ button{font-family:inherit;touch-action:manipulation}
 /* very narrow phones (360px and below) */
 @media(max-width:380px){
   .wrap{padding:0 11px}
-  .hero h1{font-size:23px}
   .qtext{font-size:15.5px}
   .opt{font-size:14.5px}
   .qbar .inner{gap:6px}
@@ -636,9 +806,6 @@ button{font-family:inherit;touch-action:manipulation}
 @media(max-height:460px) and (max-width:900px){
   .top .inner{height:46px}
   .icon-btn{height:34px}
-  .hero{padding:12px 0 0}
-  .hero h1{font-size:22px}
-  .hero p{display:none}
 }
 </style>
 </head>
@@ -962,11 +1129,13 @@ function updateMastery(it, answer, now){
 function dueCount(now){
   const m = loadMastery();
   let n = 0;
-  for (const rec of Object.values(m.items)){
+  for (const [key, rec] of Object.entries(m.items)){
     /* No level filter: a level-5 question is still scheduled (every 28 days),
        so it must still be counted when its date comes round. */
     if ((rec.due || 0) > now) continue;
-    if (!ITEMS[rec.id]) continue;                  // question left the bank
+    /* The map key is the id; rec.id is only a mirror and old records may lack
+       it, which used to make a perfectly valid due question invisible. */
+    if (!ITEMS[key]) continue;                     // question left the bank
     n++;
   }
   return n;
@@ -977,9 +1146,9 @@ function dueCount(now){
 function dueQuestions(now){
   const m = loadMastery();
   const out = [];
-  for (const rec of Object.values(m.items)){
+  for (const [key, rec] of Object.entries(m.items)){
     if ((rec.due || 0) > now) continue;
-    const it = ITEMS[rec.id];
+    const it = ITEMS[key];
     if (!it) continue;                       // question removed from the bank
     out.push({ rec, it });
   }
@@ -991,13 +1160,13 @@ function dueQuestions(now){
 function masterySummary(now){
   const m = loadMastery();
   const s = {tracked:0, due:0, mastered:0, byLevel:[0,0,0,0,0,0]};
-  for (const rec of Object.values(m.items)){
+  for (const [key, rec] of Object.entries(m.items)){
     s.tracked++;
     const lvl = Math.min(MASTERY_MAX_LEVEL, Math.max(0, rec.level || 0));
     s.byLevel[lvl]++;
     if (rec.level >= MASTERY_STABLE) s.mastered++;
     /* `due` must agree with dueCount(), which no longer excludes level 5. */
-    if ((rec.due || 0) <= now && ITEMS[rec.id]) s.due++;
+    if ((rec.due || 0) <= now && ITEMS[key]) s.due++;
   }
   return s;
 }
@@ -1007,9 +1176,9 @@ function nextDueIn(){
   const m = loadMastery();
   const now = Date.now();
   let soonest = Infinity;
-  for (const rec of Object.values(m.items)){
+  for (const [key, rec] of Object.entries(m.items)){
     /* Level 5 included: it still has a date (28 days out). */
-    if ((rec.due || 0) > now && rec.due < soonest && ITEMS[rec.id]) soonest = rec.due;
+    if ((rec.due || 0) > now && rec.due < soonest && ITEMS[key]) soonest = rec.due;
   }
   if (!isFinite(soonest)) return '';
   const ms = soonest - now;
@@ -1032,10 +1201,13 @@ function masteryBars(m){
       <span class="lv-n">${n}</span>
     </div>`;
   }).join('');
-  return `<div class="lv-wrap">
-    <div class="lv-head">مستويات الإتقان — ${m.tracked} سؤال متتبَّع${m.mastered ? `، ${m.mastered} وصل للمستوى المستقر` : ''}</div>
-    ${rows}
-  </div>`;
+  /* Kept as a disclosure: the full distribution is real information, but on
+     the home page it used to swamp the review card. Closed by default, still
+     in the DOM so nothing is lost and no extra click is needed to render. */
+  return `<details class="lv-wrap">
+    <summary class="lv-head">توزيع مستويات الإتقان — ${m.tracked} سؤال متتبَّع${m.mastered ? `، ${m.mastered} وصل للمستوى المستقر` : ''}</summary>
+    <div class="lv-body">${rows}</div>
+  </details>`;
 }
 
 function daysUntil(ts, now){
@@ -1371,34 +1543,167 @@ function render(){
 
 function totalQ(c){ return c.sections.reduce((n,s)=>n+s.items.length,0); }
 
+/* ------------------------------------------------------------------ *
+ * Home dashboard facts
+ *
+ * Pure derivation from what already exists (computeAnalytics + the mastery
+ * model). No new storage, no new tracking, no changed semantics: everything
+ * here answers "what should the student do next?" from data the app already
+ * keeps.
+ * ------------------------------------------------------------------ */
+
+/* Progress made today, for the welcome strip. Uses the same dayKey() the
+ * analytics screen groups by, so the two can never disagree. */
+function todayProgress(){
+  const today = dayKey(Date.now());
+  let answered = 0, correct = 0;
+  for (const a of loadHistory().attempts){
+    if (dayKey(a.t) !== today) continue;
+    answered++;
+    if (a.o === 'correct') correct++;
+  }
+  return { answered, correct };
+}
+
+/* A short, non-judgemental line about where the student stands. */
+function nextStepLine(stats, mastery, reviewCount, best){
+  if (reviewCount) return `عندك ${reviewCount} سؤال مستحق للمراجعة — دي أفضل خطوة دلوقتي.`;
+  const started = Object.keys(best).length;
+  if (!stats.total) return 'لسه ما جاوبتش أي سؤال. ابدأ بمقرر واحد، والتصحيح هيجيلك فورًا.';
+  if (started < DATA.length) return `خلصت ${stats.total} محاولة وجاوبت ${stats.uniqueCount} سؤال. باقي ${DATA.length - started} مقرر ما بدأتهاش.`;
+  return `جاوبت ${stats.uniqueCount} سؤال من ${DATA.reduce((n,c)=>n+totalQ(c),0)}. كمّل مراجعتك وخلي الفترات تتباعد.`;
+}
+
+/* The course the student most recently worked on. */
+function lastTouchedCourse(){
+  const h = loadHistory();
+  for (let i = h.attempts.length - 1; i >= 0; i--){
+    const c = DATA.find(x => x.id === h.attempts[i].c);
+    if (c) return c;
+  }
+  return null;
+}
+
 function renderHome(){
   const best = store.get('qb.best', {});
   const reviewCount = getReviewCount();
   const mastery = masterySummary(Date.now());
   const nextDue = nextDueIn();
-  const reviewPanel = `
-    <div class="setup" style="margin:0 0 20px">
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px">
-          <b style="font-size:15px">المراجعة الذكية</b>
-          <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
-            ${reviewCount
-              ? `لديك ${reviewCount} سؤال مستحق للمراجعة الآن`
-              : mastery.tracked
-                ? `لا يوجد مستحق الآن${nextDue ? ` — أقرب سؤال بعد ${nextDue}` : ''}`
-                : 'لسه ما فيش أسئلة في نظام المراجعة — ابدأ الحل وبيتسجل تقدمك تلقائيًا'}
-          </div>
+  const stats = computeAnalytics();
+  const today = todayProgress();
+  const sess = loadSession();
+  const resumable = validSession(sess);
+  const accent = lastTouchedCourse();
+  const totalQuestions = DATA.reduce((n,c)=>n+totalQ(c),0);
+
+  /* ---------- 1. welcome ---------- */
+  const welcome = `
+  <section class="hm-welcome">
+    <div class="hm-welcome-copy">
+      <p class="hm-eyebrow">بنك الأسئلة التفاعلي</p>
+      <h1 class="hm-title">أهلًا بيك 👋</h1>
+      <p class="hm-lede">${esc(nextStepLine(stats, mastery, reviewCount, best))}</p>
+      <div class="hm-facts">
+        <div class="hm-fact">
+          <b>${totalQuestions}</b><span>سؤال</span>
         </div>
-        <button class="primary" id="reviewBtn" style="padding:12px 20px;font-size:14.5px" ${reviewCount?'':'disabled'}>ابدأ المراجعة</button>
+        <div class="hm-fact">
+          <b>${DATA.length}</b><span>مقررات</span>
+        </div>
+        <div class="hm-fact">
+          <b>${today.answered}</b><span>${today.answered ? `محاولة النهاردة · ${today.correct} صح` : 'محاولة النهاردة'}</span>
+        </div>
       </div>
-      ${mastery.tracked ? masteryBars(mastery) : ''}
-    </div>`;
+    </div>
+    <div class="hm-portrait">
+      <picture>
+        <source srcset="src/figures/medo-developer.webp" type="image/webp">
+        <img src="src/figures/medo-developer.png" alt="ميدو، مطوّر الموقع" width="600" height="804" fetchpriority="high" decoding="async">
+      </picture>
+    </div>
+  </section>`;
+
+  /* ---------- 2. resume ---------- */
+  const done = sess ? Object.keys(sess.answers||{}).length : 0;
+  const resumeCount = sess && Array.isArray(sess.quiz) ? sess.quiz.length : 0;
+  const resume = resumable ? `
+  <section class="hm-resume" aria-label="استكمال الجلسة السابقة">
+    <div class="hm-resume-ic" aria-hidden="true">${IC.bolt}</div>
+    <div class="hm-resume-body">
+      <p class="hm-resume-kicker">${sess.isReview ? 'مراجعة الأخطاء' : 'جلسة لم تكملها'}</p>
+      <b class="hm-resume-title">${sess.isReview ? 'مراجعة لم تكتمل' : esc(DATA.find(c=>c.id===sess.courseId)?.title || 'جلسة سابقة')}</b>
+      <p class="hm-resume-meta">${done
+        ? `جاوبت ${done} من ${resumeCount} سؤال`
+        : `لسه ما جاوبتش — ${resumeCount} سؤال مستنيينك`}</p>
+      <div class="hm-resume-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${resumeCount}"
+           aria-valuenow="${done}" aria-label="التقدم في الجلسة">
+        <i style="width:${resumeCount ? Math.round(done/resumeCount*100) : 0}%"></i>
+      </div>
+    </div>
+    <div class="hm-resume-acts">
+      <button class="primary" id="resumeBtn">استكمال</button>
+      <button class="ghost-btn" id="dropBtn">حذف</button>
+    </div>
+  </section>` : '';
+
+  /* ---------- 3. progress summary ---------- */
+  const started = Object.keys(best).length;
+  const avgBest = started
+    ? Math.round(Object.values(best).reduce((n,v)=>n+v,0)/started) : 0;
+  const streak = stats.streak && stats.streak.current ? stats.streak.current : 0;
+  const progress = `
+  <section class="hm-progress" aria-label="ملخص تقدمك">
+    <div class="hm-stat">
+      <b class="hm-stat-n">${stats.accuracy}%</b>
+      <span class="hm-stat-k">دقة الإجابات</span>
+      <span class="hm-stat-sub">${stats.total ? `${stats.correct} صح من ${stats.total}` : 'لسه ما فيش محاولات'}</span>
+    </div>
+    <div class="hm-stat">
+      <b class="hm-stat-n">${stats.uniqueCount}</b>
+      <span class="hm-stat-k">سؤال مختلف</span>
+      <span class="hm-stat-sub">من ${totalQuestions} سؤال في البنك</span>
+    </div>
+    <div class="hm-stat">
+      <b class="hm-stat-n">${started}/${DATA.length}</b>
+      <span class="hm-stat-k">مقررات بدأتها</span>
+      <span class="hm-stat-sub">${started ? `متوسط أفضل نتيجة ${avgBest}%` : 'ابدأ الأول'}</span>
+    </div>
+    <div class="hm-stat">
+      <b class="hm-stat-n">${mastery.mastered}</b>
+      <span class="hm-stat-k">سؤال متقن</span>
+      <span class="hm-stat-sub">${mastery.tracked ? `من ${mastery.tracked} في نظام المراجعة` : 'بعد أول حل بيتسجل'}</span>
+    </div>
+    ${streak ? `<div class="hm-streak" title="أيام متتالية بحل أسئلة">${IC.bolt}<b>${streak}</b><span>يوم متصل</span></div>` : ''}
+  </section>`;
+
+  /* ---------- 4. smart review ---------- */
+  const reviewPanel = `
+  <section class="hm-review ${reviewCount ? 'is-due' : ''}">
+    <div class="hm-review-head">
+      <div class="hm-review-ic" aria-hidden="true">${reviewCount ? IC.bolt : IC.exam}</div>
+      <div class="hm-review-copy">
+        <b class="hm-review-title">المراجعة الذكية</b>
+        <p class="hm-review-sub">${reviewCount
+          ? `<b class="hm-due-n">${reviewCount}</b> سؤال مستحق للمراجعة الآن — مرتبة بالأقدم أولًا.`
+          : mastery.tracked
+            ? `مفيش مستحق دلوقتي${nextDue ? ` — أقرب سؤال بعد ${nextDue}` : ''}.`
+            : 'أول ما تحل سؤال بيتسجل تلقائيًا في نظام المراجعة، وبيرجع لك في الوقت المناسب.'}</p>
+      </div>
+      <button class="primary hm-review-btn" id="reviewBtn" ${reviewCount?'':'disabled'}>${reviewCount ? `ابدأ المراجعة (${reviewCount})` : 'المراجعة غير متاحة'}</button>
+    </div>
+    ${mastery.tracked ? masteryBars(mastery) : ''}
+  </section>`;
+
+  /* ---------- 5. courses ---------- */
   const cards = DATA.map(c => {
     const mcqN = c.sections.filter(s=>s.type==='mcq').reduce((n,s)=>n+s.items.length,0);
     const tfN = c.sections.filter(s=>s.type==='tf').reduce((n,s)=>n+s.items.length,0);
     const b = best[c.id];
+    const bc = stats.byCourse[c.id];
+    const acc = bc && bc.total ? Math.round(bc.correct/bc.total*100) : null;
     return `
-    <div class="course-card" style="--c:${esc(c.color)}" data-course="${esc(c.id)}">
+    <div class="course-card" style="--c:${esc(c.color)}" data-course="${esc(c.id)}"
+         role="button" tabindex="0" aria-label="فتح مقرر ${esc(c.title)} — ${totalQ(c)} سؤال">
       <div class="cc-head">
         <div class="cc-emoji">${EMO[c.id] || IC.book}</div>
         <div>
@@ -1408,54 +1713,44 @@ function renderHome(){
               .filter(Boolean).map(t=>`<span class="ccm">${t}</span>`).join('<span class="ccm sep">•</span>')}</div>
         </div>
       </div>
+      ${acc !== null ? `<div class="cc-acc" role="img" aria-label="دقة إجاباتك ${acc}%"><i style="width:${acc}%"></i></div>` : ''}
       <div class="cc-foot">
-        ${b ? `<span class="badge ${b>=70?'ok':''}">أفضل نتيجة: ${b}%</span>` : `<span class="badge">لم تبدأ بعد</span>`}
+        <span class="cc-stats">
+          ${b ? `<span class="badge ${b>=70?'ok':''}">أفضل نتيجة: ${b}%</span>` : `<span class="badge">لم تبدأ بعد</span>`}
+          ${acc !== null ? `<span class="cc-acc-t">دقة ${acc}%</span>` : ''}
+        </span>
         <span class="go">ابدأ الحل ←</span>
       </div>
     </div>`;
   }).join('');
-  const sess = loadSession();
-  const resume = validSession(sess) ? `
-    <div class="setup" style="margin-bottom:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px">
-        <b style="font-size:15px">عندك جلسة لم تكملها</b>
-        <div style="color:var(--ink-soft);font-size:13.5px;margin-top:4px">
-          ${sess.isReview?'مراجعة الأخطاء':esc(DATA.find(c=>c.id===sess.courseId)?.title || '')} — ${(()=>{
-            const done = Object.keys(sess.answers||{}).length;
-            return done ? `${done} من ${sess.quiz.length} سؤال` : `لسه ما جاوبتش، ${sess.quiz.length} سؤال مستنيينك`;
-          })()}
-        </div>
-      </div>
-      <button class="primary" id="resumeBtn" style="padding:12px 20px;font-size:14.5px">استكمال</button>
-      <button class="ghost-btn" id="dropBtn" style="padding:12px 18px;font-size:14px">حذف</button>
-    </div>` : '';
+
+  const coursesHead = `
+  <div class="hm-section-head">
+    <h2 class="hm-h2">المقررات</h2>
+    <p class="hm-h2-sub">${started ? `بدأت ${started} من ${DATA.length}` : `${DATA.length} مقررات — اختار اللي تحبه وابدأ`}</p>
+  </div>`;
+
   app.innerHTML = `
+  ${welcome}
   ${resume}
-  <section class="hero hero-intro">
-    <div class="hero-copy">
-      <h1>ذاكر، حُل، وصحّح إجاباتك فورًا</h1>
-      <p>كل أسئلة الميد تيرم في مكان واحد: أسئلة اختيار من متعدد وصح/خطأ، بتصحيح لحظي وشرح للإجابة الصحيحة، ووضع امتحان يحسب درجتك في النهاية.</p>
-      <div class="chips">
-        <span class="chip">${IC.book} ${DATA.length} مقررات</span>
-        <span class="chip">✓ ${DATA.reduce((n,c)=>n+totalQ(c),0)} سؤال محلول</span>
-        <span class="chip">${IC.bolt} تصحيح فوري</span>
-        <span class="chip">${IC.exam} وضع امتحان</span>
-      </div>
-    </div>
-    <div class="hero-portrait">
-      <picture>
-        <source srcset="src/figures/medo-developer.webp" type="image/webp">
-        <img src="src/figures/medo-developer.png" alt="ميدو، مطوّر الموقع" width="600" height="804" fetchpriority="high" decoding="async">
-      </picture>
-    </div>
-  </section>
+  ${progress}
   ${reviewPanel}
+  ${coursesHead}
   <div class="grid">${cards}</div>`;
+
   if ($('#reviewBtn')) $('#reviewBtn').onclick = startReview;
   if ($('#resumeBtn')) $('#resumeBtn').onclick = resumeSession;
   if ($('#dropBtn')) $('#dropBtn').onclick = () => { dropSession(); renderHome(); };
   document.querySelectorAll('[data-course]').forEach(card => {
     card.onclick = () => openCourse(card.dataset.course);
+    /* A div with a click handler is invisible to the keyboard; these cards are
+       the primary way into the app, so they must answer Enter and Space. */
+    card.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        openCourse(card.dataset.course);
+      }
+    };
   });
 }
 

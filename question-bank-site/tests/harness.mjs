@@ -96,7 +96,8 @@ export function boot({ seed = {}, storage = null } = {}) {
       dayKey, recentDays, ITEMS, accuracyOf, loadMastery, updateMastery,
       dueCount, dueQuestions, masterySummary, masteryBars, nextDueIn, masteryPanel, daysUntil,
       searchCourse, normaliseArabic, matchQuestion, paintSearchResults,
-      MASTERY_INTERVALS, MASTERY_MAX_LEVEL, MASTERY_MASTERED
+      MASTERY_INTERVALS, MASTERY_MAX_LEVEL, MASTERY_MASTERED,
+      renderHome, totalQ, todayProgress, masterySummary
     };`;
   window.eval(script + shim);
 
@@ -124,7 +125,8 @@ const API_NAMES = ['state', 'DATA', 'esc', 'formatRemaining', 'finish', 'goHome'
   'closeHistorySession', 'updateHistorySession', 'weakSections', 'hardestQuestions',
   'unansweredQuestions', 'dayKey', 'recentDays', 'ITEMS', 'accuracyOf',
   'loadMastery', 'updateMastery', 'dueCount', 'dueQuestions', 'masterySummary',
-  'masteryBars', 'nextDueIn', 'masteryPanel', 'daysUntil', 'searchCourse', 'normaliseArabic', 'matchQuestion', 'paintSearchResults', 'MASTERY_INTERVALS', 'MASTERY_MAX_LEVEL', 'MASTERY_MASTERED'];
+  'masteryBars', 'nextDueIn', 'masteryPanel', 'daysUntil', 'searchCourse', 'normaliseArabic', 'matchQuestion', 'paintSearchResults', 'MASTERY_INTERVALS', 'MASTERY_MAX_LEVEL', 'MASTERY_MASTERED',
+  'renderHome', 'totalQ', 'todayProgress'];
 
 export function ev(win, code) {
   if (!win.__api) throw new Failure('site api shim missing -- did the script throw?');
