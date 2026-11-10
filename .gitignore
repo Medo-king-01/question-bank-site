@@ -1,0 +1,18 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- Source PDFs (not committed: copyright) ----
+pdfs/
+question-bank-site/pdfs/
+
+# ---- Build / tooling scratch ----
+*.log
+.DS_Store
+Thumbs.db
+
+# ---- Node (test tooling only; site has zero runtime deps) ----
+node_modules/

@@ -1,0 +1,15 @@
+{
+  "name": "question-bank-site-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Behavioural tests for the single-file question bank site. Not required to build or run the site.",
+  "scripts": {
+    "test": "node tests/run.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.0"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  }
+}

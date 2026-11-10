@@ -19,14 +19,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Audit question data and stable IDs
+
+      - uses: actions/setup-node@v4
+        with:
+          # jsdom 31 requires Node >= 22.22.2 (it uses zstd via undici), so the
+          # old "20" pin made the whole suite fail at import time.
+          node-version: "22"
+
+      - name: Audit question data
         working-directory: question-bank-site
-        run: python3 scripts/extract/audit.py
+        run: python3 scripts/extract/audit.py --strict
+
       - name: Rebuild the standalone website
         working-directory: question-bank-site
         run: python3 scripts/build_site.py
+
       - name: Verify generated index is committed
         run: git diff --exit-code -- question-bank-site/index.html
+
       - name: Check embedded JavaScript syntax
         run: |
           python3 - <<'PY'
@@ -39,3 +49,193 @@ jobs:
           Path("/tmp/question-bank-site.js").write_text(html[start + 8:end], encoding="utf-8")
           PY
           node --check /tmp/question-bank-site.js
+
+      - name: Verify template structure
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          from collections import Counter
+          from pathlib import Path
+
+          src = Path("src/app_template.html").read_text(encoding="utf-8")
+          problems = []
+
+          # 1) exactly one <style> and one <script>, properly closed
+          for tag in ("style", "script"):
+              opens, closes = src.count("<%s>" % tag), src.count("</%s>" % tag)
+              if opens != 1 or closes != 1:
+                  problems.append("%s blocks: %d open, %d close" % (tag, opens, closes))
+
+          if not problems:
+              style = src[: src.index("</style>")]
+              js = src[src.index("<script>") : src.rindex("</script>")]
+              # 2) no JavaScript leaked into the stylesheet
+              if "function " in style:
+                  problems.append("JavaScript found inside <style>")
+              # 3) no duplicated top-level function definition
+              dupes = {n: c for n, c in Counter(re.findall(r"^function (\w+)", js, re.M)).items() if c > 1}
+              if dupes:
+                  problems.append("duplicate functions: %s" % dupes)
+
+          if problems:
+              for p in problems:
+                  print("::error::" + p)
+              sys.exit(1)
+          print("template structure OK")
+          PY
+
+      - name: Install test tooling (jsdom only; the site itself has no deps)
+        working-directory: question-bank-site
+        run: npm install --no-save --no-audit --no-fund jsdom
+
+      - name: Run behavioural tests
+        working-directory: question-bank-site
+        run: node tests/run.mjs
+
+  mutants:
+    # The tests are only worth something if they fail on a broken site.
+    # This job deliberately breaks a known invariant and expects a red build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # jsdom 31 requires Node >= 22.22.2 (it uses zstd via undici), so the
+          # old "20" pin made the whole suite fail at import time.
+          node-version: "22"
+      - name: Install test tooling
+        working-directory: question-bank-site
+        run: npm install --no-save --no-audit --no-fund jsdom
+      - name: Mutation check - a broken esc() must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "  return String(value).replace(/[&<>\"']/g, ch => ESC_MAP[ch]);"
+          assert needle in s, "esc() implementation changed - update this mutation"
+          p.write_text(s.replace(needle, "  return String(value);"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant.log 2>&1; then
+            echo "::error::The suite passed against a deliberately broken build."
+            cat /tmp/mutant.log
+            exit 1
+          fi
+          echo "OK - the suite caught the broken build."
+          grep -c "✗" /tmp/mutant.log || true
+
+      - name: Mutation check - a broken analytics total must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "stats.accuracy = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;"
+          assert needle in s, "accuracy formula changed - update this mutation"
+          p.write_text(s.replace(needle, "stats.accuracy = stats.total ? Math.round(stats.correct / (stats.total + 1) * 100) : 0;"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-an.log 2>&1; then
+            echo "::error::The suite passed with a wrong accuracy formula."
+            cat /tmp/mutant-an.log
+            exit 1
+          fi
+          echo "OK - the suite caught the wrong analytics formula."
+
+      - name: Mutation check - a flat mastery curve must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "rec.level = Math.min(MASTERY_MAX_LEVEL, (rec.level || 0) + 1);"
+          assert needle in s, "mastery promotion changed - update this mutation"
+          p.write_text(s.replace(needle, "rec.level = 0;"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-mastery.log 2>&1; then
+            echo "::error::The suite passed with the mastery curve flattened."
+            cat /tmp/mutant-mastery.log
+            exit 1
+          fi
+          echo "OK - the suite caught the flat mastery curve."
+
+      - name: Verify PWA files ship next to index.html
+        run: |
+          cd question-bank-site
+          test -f manifest.json || { echo "manifest.json missing from the site root"; exit 1; }
+          test -f sw.js        || { echo "sw.js missing from the site root"; exit 1; }
+          python3 - <<'EOF'
+          import json, os, sys
+          m = json.load(open('manifest.json', encoding='utf-8'))
+          bad = [i['src'] for i in m['icons'] if not os.path.exists(i['src'])]
+          if bad:
+              sys.exit('manifest icons missing: ' + ', '.join(bad))
+          print('manifest OK: %d icons, all present' % len(m['icons']))
+          EOF
+          node --check sw.js
+          echo "service worker parses"
+
+      - name: Mutation check - a broken offline shell must fail the suite
+        run: |
+          cd question-bank-site
+          python3 scripts/build_site.py
+          cp src/pwa/sw.js /tmp/sw.bak
+          # break the offline fallback: navigations no longer consult the cache
+          python3 - <<'EOF'
+          p = 'src/pwa/sw.js'
+          s = open(p, encoding='utf-8').read()
+          s2 = s.replace("return (await cache.match('./index.html'))", "throw new Error('offline')", 1)
+          assert s2 != s, 'mutation target not found'
+          open(p, 'w', encoding='utf-8').write(s2)
+          EOF
+          if python3 scripts/build_site.py && node tests/run.mjs > /tmp/out.txt 2>&1; then
+            echo "THE SUITE PASSED WITH A BROKEN OFFLINE FALLBACK"; cat /tmp/out.txt; exit 1
+          fi
+          echo "mutation caught as expected"
+          cp /tmp/sw.bak src/pwa/sw.js
+          python3 scripts/build_site.py
+
+      - name: Mutation check - a bank-wide search must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "  for (const section of course.sections){"
+          assert needle in s, "search scope changed - update this mutation"
+          p.write_text(s.replace(needle, "  for (const section of DATA.flatMap(cc => cc.sections)){"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-search.log 2>&1; then
+            echo "::error::The suite passed with a cross-course search."
+            cat /tmp/mutant-search.log
+            exit 1
+          fi
+          echo "OK - the suite caught the scope leak."
+
+      - name: Mutation check - a dead timer must fail the suite
+        working-directory: question-bank-site
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("src/app_template.html")
+          s = p.read_text(encoding="utf-8")
+          needle = "if(left<=0){stopExamTimer();finish(true);}"
+          assert needle in s, "timer auto-submit changed - update this mutation"
+          p.write_text(s.replace(needle, "if(left<=0){stopExamTimer();}"), encoding="utf-8")
+          PY
+          python3 scripts/build_site.py
+          if node tests/run.mjs > /tmp/mutant-timer.log 2>&1; then
+            echo "::error::The suite passed with the exam timer disabled."
+            cat /tmp/mutant-timer.log
+            exit 1
+          fi
+          echo "OK - the suite caught the dead timer."
+
