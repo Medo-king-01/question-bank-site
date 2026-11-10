@@ -89,6 +89,12 @@ jobs:
         working-directory: question-bank-site
         run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
 
+      - name: Install screenshot tooling (Pillow; only paints the evidence PNGs)
+        # tests/render.test.mjs runs scripts/render_home_layout.py, which needs
+        # Pillow to write docs/screenshots. Without it the render tests would
+        # fail for an environment reason rather than a layout reason.
+        run: python3 -m pip install --disable-pip-version-check --quiet pillow
+
       - name: Run behavioural tests
         working-directory: question-bank-site
         run: node tests/run.mjs
@@ -107,6 +113,10 @@ jobs:
       - name: Install test tooling
         working-directory: question-bank-site
         run: npm install --no-save --no-audit --no-fund jsdom@31.0.0
+      - name: Install screenshot tooling (Pillow)
+        # Must be present here too: a mutation is only "caught" if the suite
+        # fails because of the mutated code, not because a tool was missing.
+        run: python3 -m pip install --disable-pip-version-check --quiet pillow
       - name: Mutation check - a broken esc() must fail the suite
         working-directory: question-bank-site
         run: |

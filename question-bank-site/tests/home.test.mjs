@@ -267,40 +267,66 @@ group('HOME · course list', () => {
 });
 
 group('HOME · progress grid', () => {
-  /* Simulate CSS Grid auto-placement the way the browser does it, because
-     jsdom has no layout engine and "the pill looks lower" is not a test.
-     Mirrors the spec order: explicitly positioned items claim their cells
-     first, then auto items fill the remaining space in document order. */
-  const layout = (children, cols) => {
+  /* ------------------------------------------------------------------ *
+   * A model of CSS Grid auto-placement, because jsdom has no layout engine
+   * and "the pill looks lower" is not a test.
+   *
+   * Item shape matters here. Items are objects:
+   *     { kind: 'stat' }                  a statistic
+   *     { kind: 'streak' }                the streak badge, auto-placed
+   *     { kind: 'streak', row: 2 }        the streak badge, explicitly placed
+   * An earlier version of this helper compared the whole item to the string
+   * 'streak', so an object item never matched, every fixture was laid out as
+   * a plain statistic, and the "pinned" case silently stopped testing the pin.
+   * The recognised shape is now explicit and asserted below.
+   * ------------------------------------------------------------------ */
+  const isStreak = (item) => Boolean(item) && item.kind === 'streak';
+
+  const layout = (items, cols) => {
     const occupied = new Set();
     const placed = new Map();
-    for (const [i, kind] of children.entries()) {
-      if (kind !== 'streak' || kind.row == null) continue;
-      for (let c = 1; c <= cols; c++) occupied.add(`${kind.row}:${c}`);
-      /* Record every column it occupies: the row-count assertions below read
-         the model back, and a pinned streak spanning the row owns all of it. */
-      placed.set(i, { row: kind.row, col: 1, span: cols });
+
+    /* Spec order: items with an explicit row are placed before auto items. */
+    for (const [i, item] of items.entries()) {
+      if (!isStreak(item) || item.row == null) continue;
+      for (let c = 1; c <= cols; c++) occupied.add(`${item.row}:${c}`);
+      placed.set(i, { row: item.row, col: 1, span: cols });
     }
+
     let row = 1, col = 1;
-    for (const [i, kind] of children.entries()) {
+    for (const [i, item] of items.entries()) {
       if (placed.has(i)) continue;
-      const span = kind === 'streak' ? cols : 1;
+      const span = isStreak(item) ? cols : 1;
       for (;;) {
         if (col + span - 1 > cols) { row++; col = 1; continue; }
         const cells = Array.from({ length: span }, (_, k) => `${row}:${col + k}`);
         if (cells.some((c) => occupied.has(c))) { col++; continue; }
         cells.forEach((c) => occupied.add(c));
-        placed.set(i, { row, col });
+        placed.set(i, { row, col, span });
         col += span;
         break;
       }
     }
+
+    /* Return rows -> item indices, so assertions can name what landed where. */
     const rows = {};
-    for (const [, p] of placed) {
-      for (let k = 0; k < (p.span || 1); k++) (rows[p.row] ||= []).push(p.col + k);
-    }
+    for (const [i, p] of placed) (rows[p.row] ||= []).push(i);
     return rows;
   };
+
+  /* A five-item page: four statistics then the badge, matching the markup. */
+  const page = (streakRow = null) => [
+    { kind: 'stat' }, { kind: 'stat' }, { kind: 'stat' }, { kind: 'stat' },
+    streakRow == null ? { kind: 'streak' } : { kind: 'streak', row: streakRow },
+  ];
+
+  it('recognises the streak item by kind, not by identity', () => {
+    /* Guards the helper itself: if this drifts, every assertion below turns
+       into a tautology that passes against broken CSS. */
+    eq(isStreak({ kind: 'streak' }), true, 'a streak object must be recognised');
+    eq(isStreak({ kind: 'streak', row: 2 }), true, 'a pinned streak object must be recognised');
+    eq(isStreak({ kind: 'stat' }), false, 'a stat must not be mistaken for the streak');
+  });
 
   it('keeps the streak last in DOM order, after all four statistics', () => {
     const { document, window } = boot();
@@ -316,12 +342,8 @@ group('HOME · progress grid', () => {
   });
 
   it('does not pin the streak to a row, so 2x2 stays a 2x2', () => {
-    /* The regression this guards: `grid-row:2` makes the streak claim row 2
-       before auto-placement runs, so at two columns a statistic gets stranded
-       on a third row and the block stops being an even 2x2.
-       This reads the stylesheet, not the rendered DOM: the streak only renders
-       when a history exists, and an earlier version of this test returned
-       early in that case -- passing silently against a pinned rule. */
+    /* Reads the stylesheet rather than the DOM: the streak only renders when a
+       history exists, and checking the DOM bailed out silently in that case. */
     const sheet = readFileSync(join(ROOT, 'index.html'), 'utf8');
     const css = sheet.slice(sheet.indexOf('<style>'), sheet.indexOf('</style>'));
     const at = css.indexOf('.hm-streak{');
@@ -336,30 +358,75 @@ group('HOME · progress grid', () => {
   });
 
   it('lays out as a 2x2 block with the streak underneath at two columns', () => {
-    const kinds = ['stat', 'stat', 'stat', 'stat', { streak: true }];
-    const standard = layout(kinds, 2);
-    eq(Object.keys(standard).length, 3, 'two stats rows plus one streak row');
-    eq(standard[1].length, 2, 'row 1 holds two stats');
-    eq(standard[2].length, 2, 'row 2 holds the other two stats');
-    eq(standard[3].length, 1, 'the streak sits alone on row 3');
+    const rows = layout(page(), 2);
+    eq(Object.keys(rows).length, 3, 'two stats rows plus one streak row');
+    eq(rows[1].length, 2, 'row 1 holds statistics 1 and 2');
+    eq(rows[2].length, 2, 'row 2 holds statistics 3 and 4');
+    eq(rows[3], [4], 'the streak sits alone on row 3');
   });
 
-  it('would fail the 2x2 block if the streak were pinned to row 2', () => {
-    /* Proves the assertion above has teeth: the pinned variant is modelled
-       too, and it must produce the broken layout. */
-    const pinned = layout(['stat', 'stat', 'stat', 'stat', { streak: true, row: 2 }], 2);
-    /* The streak claims row 2, so the third stat cannot complete the block and
-       spills to row 3 by itself -- one stat stranded on its own row, which is
-       exactly the ragged layout the reviewer spotted. */
-    eq(Object.keys(pinned).length, 3, 'pinning produces three rows instead of two');
-    eq(pinned[3].length, 1, 'a statistic is stranded on its own row');
-    eq(pinned[3].length < pinned[2].length, true, 'the block is no longer an even 2x2');
+  it('breaks the 2x2 block when the streak is pinned to row 2', () => {
+    /* The fixture now really pins. What pinning actually does at two columns
+       is not "strand one stat" -- the badge claims row 2, so the last two
+       statistics are pushed to row 3 and the badge ends up sandwiched
+       *between* the stats instead of sitting below them. */
+    const pinned = layout(page(2), 2);
+    const flowing = layout(page(), 2);
+
+    eq(Object.keys(pinned).length, 3, 'pinning still produces three rows');
+    eq(pinned[2], [4], 'the pinned streak owns row 2 outright');
+    eq(pinned[3], [2, 3], 'statistics 3 and 4 are pushed to row 3');
+    assert(pinned[2].length < 2, 'row 2 is no longer a 2x2 pair');
+
+    /* The badge must end up below every statistic. Pinning violates that. */
+    const streakBelow = (rows) => rows[3] && rows[3].includes(4);
+    eq(streakBelow(flowing), true, 'flowing: streak is the last row');
+    eq(streakBelow(pinned), false, 'pinned: streak sits above two statistics');
   });
 
   it('keeps a single row of four stats plus the streak on wide screens', () => {
-    const wide = layout(['stat', 'stat', 'stat', 'stat', { streak: true }], 4);
-    eq(wide[1].length, 4, 'all four stats share row 1');
-    eq(wide[2].length, 1, 'the streak is the second row');
+    const flowing = layout(page(), 4);
+    eq(flowing[1].length, 4, 'all four stats share row 1');
+    eq(flowing[2], [4], 'the streak is the second row');
+
+    /* At four columns pinning and flowing produce the same picture, which is
+       exactly why this bug survived a wide-screen check. Assert they agree
+       here -- and the test below asserts they disagree at two columns. */
+    const pinned = layout(page(2), 4);
+    eq(pinned[1].length, 4, 'pinned: four stats still fit row 1');
+    eq(pinned[2], [4], 'pinned: streak still lands on row 2');
+    eq(JSON.stringify(pinned), JSON.stringify(flowing),
+      'wide screens cannot tell the two placements apart');
+  });
+
+  it('distinguishes the two placements with the model alone', () => {
+    /* Isolation check: no stylesheet, no DOM -- only the placement model. If
+       this ever passes for a pinned fixture, the model is broken again and
+       every assertion above becomes decorative. */
+    const flowing = layout(page(), 2);
+    const pinned = layout(page(2), 2);
+    assert(JSON.stringify(flowing) !== JSON.stringify(pinned),
+      'the model cannot tell a pinned streak from a flowing one');
+
+    eq(flowing[3], [4], 'flowing: the badge is the last row');
+    eq(pinned[3], [2, 3], 'pinned: statistics are displaced below the badge');
+    assert(!pinned[3].includes(4), 'pinned: the badge is no longer last');
+  });
+
+  it('matches the placement the browser would produce at the two review widths', () => {
+    /* 768px resolves to five auto-fit columns; 390px hits the two-column rule. */
+    const wide = layout(page(), 5);
+    eq(wide[1].length, 4, '768px: four stats in one row');
+    eq(wide[2], [4], '768px: streak directly beneath them');
+
+    const narrow = layout(page(), 2);
+    eq(narrow[1].length, 2, '390px: first pair');
+    eq(narrow[2].length, 2, '390px: second pair');
+    eq(narrow[3], [4], '390px: streak on its own row');
+
+    /* The whole point of the review note: the two widths disagree. */
+    assert(JSON.stringify(layout(page(), 2)) !== JSON.stringify(layout(page(2), 2)),
+      'at two columns a pinned streak must produce a different layout');
   });
 });
 
